@@ -26,12 +26,12 @@ jobs:
         run: node node_modules/typescript/bin/tsc --noEmit
       - name: Build and verify static GitHub Pages
         run: npm run build:pages
-      - name: Check committed Pages against clean build
+      - name: Require committed Pages to match source build
         run: |
           if test -n "$(git status --porcelain -- docs/)"; then
-            echo "::warning::The committed docs/ differs from a clean build. Commit the generated docs/ before treating Pages as current."
+            echo "::error::Compiled docs/ differs from source. Run npm run build:pages and commit docs/ before release."
             git status --short -- docs/
             git diff -- docs/index.html
-          else
-            echo "PASS: committed docs/ exactly matches the clean Vite Pages build."
+            exit 1
           fi
+          echo "PASS: committed docs/ exactly matches the clean Vite Pages build."
