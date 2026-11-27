@@ -1,0 +1,58 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Every user's trips live in a separate collection identified by Firebase Auth UID.
+    // Other users, unauthenticated visitors, and broad collection-group reads are denied.
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function validTripRecord(uid, tripId) {
+      return request.resource.data.keys().hasOnly([
+        'ownerUid', 'revision', 'updatedAt', 'deleted', 'trip'
+      ]) &&
+      request.resource.data.keys().hasAll([
+        'ownerUid', 'revision', 'updatedAt', 'deleted', 'trip'
+      ]) &&
+      request.resource.data.ownerUid == uid &&
+      request.resource.data.revision is int &&
+      request.resource.data.revision > 0 &&
+      request.resource.data.updatedAt == request.time &&
+      request.resource.data.deleted is bool &&
+      (
+        (request.resource.data.deleted == true && request.resource.data.trip == null) ||
+        (request.resource.data.deleted == false &&
+          request.resource.data.trip is map &&
+          request.resource.data.trip.id == tripId &&
+          request.resource.data.trip.title is string &&
+          request.resource.data.trip.destination is string &&
+          request.resource.data.trip.startDate is string &&
+          request.resource.data.trip.endDate is string &&
+          request.resource.data.trip.activities is list &&
+          request.resource.data.trip.expenses is list &&
+          request.resource.data.trip.bookings is list &&
+          request.resource.data.trip.places is list &&
+          request.resource.data.trip.checklist is list)
+      );
+    }
+
+    match /users/{uid}/trips/{tripId} {
+      allow get, list: if isOwner(uid);
+      allow create: if isOwner(uid) &&
+        validTripRecord(uid, tripId) &&
+        request.resource.data.revision == 1;
+      allow update: if isOwner(uid) &&
+        resource.data.ownerUid == uid &&
+        validTripRecord(uid, tripId) &&
+        request.resource.data.revision == resource.data.revision + 1;
+      // Deletion is represented by a revisioned tombstone to prevent old
+      // offline devices from quietly resurrecting the deleted trip.
+      allow delete: if false;
+    }
+
+    // Nothing else in the database can be accessed by this web app.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
