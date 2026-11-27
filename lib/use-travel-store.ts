@@ -289,7 +289,13 @@ export function createTravelStoreController(userId: string | null, environment: 
     }
     if (!dirty) {
       if (!sameLocalHead(localBaseline, observed.head)) adoptLocalHead(observed.head);
-      else publish({ ready: true, status: "local", message: "" });
+      else {
+        // Reload may adopt an outbox already committed to this exact head. Retire
+        // that unchanged source now, before a later edit becomes a new snapshot.
+        removeAcknowledgedSources(current);
+        publish({ ready: true, status: "local", message: "" });
+        scanDrafts();
+      }
       return;
     }
     if (observed.head && sameTrips(current, observed.head.trips)) {
@@ -298,7 +304,9 @@ export function createTravelStoreController(userId: string | null, environment: 
       dirty = false;
       conflict = false;
       persistDraft();
+      removeAcknowledgedSources(current);
       publish({ trips: current, ready: true, status: "local", message: "" });
+      scanDrafts();
       return;
     }
     if (conflict || !sameLocalHead(localBaseline, observed.head) || baseRevision !== (observed.head?.revision ?? 0)) { markLocalConflict(); return; }

@@ -221,6 +221,36 @@ await test('scoped null-user start/change/retry/reload and deliberate empty refr
   const newTab=client(srv,storage,new MemoryStorage(),null,pagesScope);await newTab.c.start();assert.deepEqual(newTab.c.getSnapshot().trips,[]);assert.equal(srv.calls.length,0);
 });
 
+await test('a saved local snapshot is acknowledged on same-session reload before later edits or deletion',async()=>{
+  const srv=server(),storage=new MemoryStorage(),session=new MemoryStorage();const first=client(srv,storage,session,null,pagesScope);
+  await first.c.start();first.c.change([trip('Saved before refresh')]);const sourceKey=first.ownKey(),head=storage.getItem(`${pagesKey}:clean`);first.c.stop();
+  const refreshed=client(srv,storage,session,null,pagesScope);await refreshed.c.start();
+  assert.equal(storage.getItem(sourceKey),null);assert.equal(storage.getItem(`${pagesKey}:clean`),head);assert.equal(refreshed.c.getSnapshot().recoverableDrafts.length,0);
+  refreshed.c.change([trip('Edited after refresh')],refreshed.c.getSnapshot().trips);assert.equal(refreshed.c.getSnapshot().recoverableDrafts.length,0);
+  refreshed.c.change([],refreshed.c.getSnapshot().trips);assert.deepEqual(refreshed.c.getSnapshot().trips,[]);assert.equal(refreshed.c.getSnapshot().recoverableDrafts.length,0);
+  const interruptedKey=refreshed.ownKey();storage.setItem(interruptedKey,JSON.stringify({...JSON.parse(storage.getItem(interruptedKey)),localSaved:false}));refreshed.c.stop();
+  const interrupted=client(srv,storage,session,null,pagesScope);await interrupted.c.start();assert.deepEqual(interrupted.c.getSnapshot().trips,[]);assert.equal(storage.getItem(interruptedKey),null);
+  interrupted.c.change([trip('Edit after saved-marker interruption')]);assert.equal(interrupted.c.getSnapshot().recoverableDrafts.length,0);assert.equal(srv.calls.length,0);
+});
+
+await test('local reload keeps a saved source that diverges from the newer shared head',async()=>{
+  const srv=server(),storage=new MemoryStorage(),session=new MemoryStorage();const first=client(srv,storage,session,null,pagesScope);
+  await first.c.start();first.c.change([trip('Earlier separate snapshot')]);const sourceKey=first.ownKey(),sourceRaw=storage.getItem(sourceKey);first.c.stop();
+  const other=client(srv,storage,new MemoryStorage(),null,pagesScope);await other.c.start();other.c.change([trip('Newer shared plan')]);
+  const refreshed=client(srv,storage,session,null,pagesScope);await refreshed.c.start();
+  assert.equal(refreshed.c.getSnapshot().trips[0].title,'Newer shared plan');assert.equal(storage.getItem(sourceKey),sourceRaw);assert(refreshed.c.getSnapshot().recoverableDrafts.some(d=>d.trips[0].title==='Earlier separate snapshot'));
+  refreshed.c.change([trip('New intentional edit')]);assert.equal(storage.getItem(sourceKey),sourceRaw);assert(refreshed.c.getSnapshot().recoverableDrafts.some(d=>d.trips[0].title==='Earlier separate snapshot'));assert.equal(srv.calls.length,0);
+});
+
+await test('local acknowledgment preserves a source changed after reload adopted its original bytes',async()=>{
+  const srv=server(),storage=new MemoryStorage(),session=new MemoryStorage();const first=client(srv,storage,session,null,pagesScope);
+  await first.c.start();first.c.change([trip('Acknowledged shared snapshot')]);const sourceKey=first.ownKey(),source=JSON.parse(storage.getItem(sourceKey));first.c.stop();
+  const changedRaw=JSON.stringify({...source,trips:[trip('Source changed by another page')],localSaved:false});const refreshed=client(srv,storage,session,null,pagesScope);let changed=false;
+  const unsubscribe=refreshed.c.subscribe(()=>{if(!changed&&refreshed.c.getSnapshot().trips[0]?.title==='Acknowledged shared snapshot'){changed=true;storage.setItem(sourceKey,changedRaw);}});
+  await refreshed.c.start();unsubscribe();assert(changed);assert.equal(storage.getItem(sourceKey),changedRaw);assert(refreshed.c.getSnapshot().recoverableDrafts.some(d=>d.trips[0].title==='Source changed by another page'));
+  refreshed.c.change([trip('Later local edit')]);assert.equal(storage.getItem(sourceKey),changedRaw);assert.equal(srv.calls.length,0);
+});
+
 await test('Pages scope isolates local cache/outbox/session keys from the unchanged Site preview namespace',async()=>{
   const srv=server(),storage=new MemoryStorage(),session=new MemoryStorage();const site=client(srv,storage,session,null);await site.c.start();site.c.change([trip('Existing Site preview')]);
   const siteHead=storage.getItem('len-duong:v1:preview:clean');const pages=client(srv,storage,session,null,pagesScope);await pages.c.start();assert.notEqual(pages.c.getSnapshot().trips[0].title,'Existing Site preview');pages.c.change([trip('Pages only')]);

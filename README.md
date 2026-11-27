@@ -126,12 +126,12 @@ Trong môi trường Sites được quản lý, dùng `sites-preview start <chec
 
 ## Kiểm tra
 
-`npm test` chạy **6 suite, 99 tình huống/nhóm kiểm tra**, tất cả đã qua trong lần rà cuối:
+`npm test` chạy **6 suite, 102 tình huống/nhóm kiểm tra**, tất cả đã qua trong lần rà cuối:
 
 | Nhóm | Số kiểm tra | Nội dung chính |
 |---|---:|---|
 | Model | 18 | Tiền, hoàn tiền, chia nhóm, ngày/qua đêm, sao chép, ICS, Maps và giới hạn byte |
-| Persistence | 29 | Nhiều tab, CAS phía client, mất mạng/phản hồi, khôi phục, storage lỗi, đổi tài khoản; thêm local có namespace, không gọi API, focus/tab cũ, empty reload và StrictMode |
+| Persistence | 32 | Nhiều tab, CAS phía client, mất mạng/phản hồi, khôi phục, storage lỗi, đổi tài khoản; thêm local có namespace, không gọi API, focus/tab cũ, empty reload, StrictMode và loại bản nháp dư sau tải lại |
 | Discovery | 5 | 32 địa điểm, schema, nguồn, bộ lịch gợi ý qua nửa đêm/năm mới |
 | UI helpers | 13 | Hợp nhất biểu mẫu, xung đột metadata, đổi thành viên/ngày, nhân bản, xuất ngoại tuyến/chia sẻ |
 | API | 26 | Xác thực, danh tính kỳ vọng, cách ly người dùng, CAS cạnh tranh, request sai và giới hạn UTF-8 |
@@ -140,6 +140,8 @@ Trong môi trường Sites được quản lý, dùng `sites-preview start <chec
 Bản GitHub Pages được build riêng bằng `npm run build:pages`; bộ kiểm tra xác nhận `.nojekyll`, project base, favicon, ảnh/font và các tham chiếu tài nguyên nội bộ. Build kiểm tra cả module graph để chặn dependency máy chủ. Kiểm tra TypeScript đầy đủ cũng đã qua. API tests dùng handler/auth/Drizzle thật với adapter D1 trên SQLite cục bộ; không ghi dữ liệu production.
 
 Đã thao tác bản xem thử trong trình duyệt: tạo chuyến và thành viên; lọc/lưu địa điểm, thêm hoạt động; thực chi theo người, chia tiền, hủy/hoàn đặt chỗ; tìm nguồn không dấu, lưu/sửa/đánh dấu đã đọc, tải trang kiểm tra dữ liệu còn; lưu ghi chú, sao chép ngày và Hoàn tác; chọn tuyến công cộng 9 điểm thành 8 chặng, chỉ đường xe máy, bộ lọc mặc định Đà Lạt. Đã quan sát giao diện Nguồn tham khảo và không thấy lỗi ứng dụng trong console của preview.
+
+Đã mở bản GitHub Pages công khai trong trình duyệt: ảnh/font hiển thị; tạo chuyến, sửa tên/ngày/ghi chú, lưu và tải lại trang vẫn giữ dữ liệu; xóa chuyến kiểm thử. Không có lỗi từ app trong log đã kiểm tra (bỏ qua log extension của môi trường).
 
 Giới hạn kiểm chứng: chưa kiểm tra trên thiết bị di động thật, tài khoản production của bản Sites trong trình duyệt hoặc mọi kết quả sau khi mở app Google Maps. Cơ chế đồng bộ Sites được kiểm tra bằng integration/regression; liên kết ngoài cần mạng và khả dụng tùy dịch vụ/khu vực. GitHub Pages có build riêng, không cần máy chủ của Sites.
 
