@@ -238,13 +238,18 @@
       "city": "Huế",
       "name": "Cà phê Muối Đặng Thái Thân",
       "type": "coffee",
-      "cost": 45000,
+      "cost": 30000,
       "minutes": 55,
       "area": "Kinh Thành",
       "address": "142 Đặng Thái Thân, Huế",
       "effort": "easy",
-      "sourceUrl": "https://vietnam.travel/vi/place-to-go/north-central-coast/hue/",
-      "review": null
+      "sourceUrl": "https://www.foody.vn/hue/muoi-cafe-co-so-2-dang-thai-than",
+      "review": {
+        "date": "Nguồn đánh giá công khai (xem ngày 27/11/2026)",
+        "url": "https://www.foody.vn/hue/muoi-cafe-co-so-2-dang-thai-than",
+        "summary": "Trang Foody có ảnh và nhận xét của khách, khen món cà phê muối; cũng có góp ý về đồ uống khác và không gian buổi tối.",
+        "caveat": "Trích ý từ nhận xét cá nhân, không tự quy đổi điểm sao."
+      }
     },
     {
       "id": "mt-3-0",
@@ -729,14 +734,14 @@
     {
       "id": "mt-8-5",
       "city": "Ninh Bình",
-      "name": "Tam Cốc Garden Café",
+      "name": "COCO.A Cafe Tam Cốc",
       "type": "coffee",
       "cost": 65000,
       "minutes": 60,
       "area": "Tam Cốc",
-      "address": "Tam Cốc Garden Café, Ninh Bình",
+      "address": "COCO.A Cafe, Tam Cốc, Ninh Bình",
       "effort": "easy",
-      "sourceUrl": "https://vietnam.travel/vi/plan-your-trip/recommended-trip/heritage-sites-vietnam/",
+      "sourceUrl": "https://nhahangdenuininhbinh.vn/en/coffee-guide/",
       "review": null
     },
     {
@@ -871,13 +876,18 @@
       "city": "TP.HCM",
       "name": "Cơm tấm Ba Ghiền",
       "type": "food",
-      "cost": 95000,
+      "cost": 115000,
       "minutes": 60,
       "area": "Phú Nhuận",
       "address": "84 Đặng Văn Ngữ, Thành phố Hồ Chí Minh",
       "effort": "easy",
-      "sourceUrl": "https://vietnam.travel/vi/plan-your-trip/recommended-trip/vietnam-highlights/",
-      "review": null
+      "sourceUrl": "https://guide.michelin.com/en/ho-chi-minh/ho-chi-minh_2978179/restaurant/com-tam-ba-ghien",
+      "review": {
+        "date": "04–07/2026",
+        "url": "https://food.be.com.vn/ho-chi-minh/com-tam-ba-ghien-khong-chi-nhanh-84-dang-van-ngu-43377",
+        "summary": "Nhận xét đặt món ghi nhận sườn lớn, được khen về hương vị và khẩu phần; cũng có phản hồi về thiếu món và món chưa đều chất lượng.",
+        "caveat": "Đánh giá giao hàng, không phải trải nghiệm tại bàn; giá thực tế thay đổi theo món."
+      }
     },
     {
       "id": "mt-10-4",
