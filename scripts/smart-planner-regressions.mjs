@@ -50,7 +50,7 @@ for(const city of new Set(places.map(p=>p.city))){
   assert.equal(trip.people,people);
   assert.equal(trip.budget,budget);
   assert.equal(trip.activities.length<=days*4,true);
-  assert.equal(trip.expenses.length,days*2);
+  assert.equal(trip.expenses.length,days*2-1,'One lodging charge per night, not per day');
   const cost=trip.activities.reduce((n,a)=>n+a.cost*people,0)+trip.expenses.reduce((n,e)=>n+e.cost*people,0);
   assert(cost<=budget,'Planner should not exceed entered budget');
   for(const a of trip.activities)assert(a.startTime<a.endTime,'Activity ends after it starts');
