@@ -1,0 +1,19 @@
+{
+  "name": "Make Tour Plan – Lên đường",
+  "short_name": "Make Tour Plan",
+  "lang": "vi-VN",
+  "description": "Lập kế hoạch du lịch, ghi chú, ngân sách và chỉ đường Việt Nam.",
+  "start_url": "/Make-Tour-Plan/",
+  "scope": "/Make-Tour-Plan/",
+  "display": "standalone",
+  "background_color": "#f5f6f0",
+  "theme_color": "#214b36",
+  "icons": [
+    {
+      "src": "/Make-Tour-Plan/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
