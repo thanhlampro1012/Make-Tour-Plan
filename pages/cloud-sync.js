@@ -2,17 +2,35 @@
    Secret Gists are unlisted, NOT private; never upload unencrypted trips. */
 (()=>{
 "use strict";
-const CLEAN="make-tour-plan:pages:v1:preview:clean",SETTINGS="make-tour-plan:cloud:v1";
+const CLEAN="make-tour-plan:pages:v1:preview:clean",SETTINGS="make-tour-plan:cloud:v1",OWNER="make-tour-plan:cloud:owner:v1";
 const FILE="make-tour-plan-cloud.json",PART="make-tour-plan-part-",FORMAT="make-tour-plan-sync/v1";
 const API="https://api.github.com",SIZE=420000,MAX_PARTS=10,MAX_BYTES=1800000,KDF=310000;
 const enc=new TextEncoder(),dec=new TextDecoder(),$=id=>document.getElementById(id);
 let auth=null,connected=false,pending=null,busy=false,clock=0,base="",baseline="",lastCheck=0,downloaded=false;
 const parse=x=>{try{return JSON.parse(x)}catch{return null}};
 const bytes=x=>enc.encode(JSON.stringify(x)).length;
+function isoDate(d){if(typeof d!=="string"||!/^\\d{4}-\\d{2}-\\d{2}$/.test(d))return false;
+ const year=Number(d.slice(0,4));if(year<1900||year>2199)return false;
+ const date=new Date(d+"T00:00:00.000Z");return !Number.isNaN(date.valueOf())&&date.toISOString().slice(0,10)===d;}
+function validTrip(t){if(!t||typeof t!=="object"||typeof t.id!=="string"||
+ !/^[A-Za-z0-9][A-Za-z0-9_-]{0,95}$/.test(t.id)||typeof t.title!=="string"||
+ t.title.trim().length===0||t.title.length>180||typeof t.destination!=="string"||
+ !t.destination.trim()||!isoDate(t.startDate)||!isoDate(t.endDate)||
+ t.endDate<t.startDate||((Date.parse(t.endDate)-Date.parse(t.startDate))/86400000)>89||
+ !Number.isInteger(t.people)||t.people<1||t.people>100||
+ typeof t.budget!=="number"||!Number.isFinite(t.budget)||t.budget<0||t.budget>1e12||
+ typeof t.timezone!=="string"||typeof t.notes!=="string"||typeof t.sample!=="boolean"||
+ !Array.isArray(t.activities)||t.activities.length>600||
+ !Array.isArray(t.expenses)||t.expenses.length>400||
+ !Array.isArray(t.bookings)||t.bookings.length>100||
+ !Array.isArray(t.places)||t.places.length>300||
+ !Array.isArray(t.checklist)||t.checklist.length>500||
+ !t.dayNotes||typeof t.dayNotes!=="object"||Array.isArray(t.dayNotes))return false;
+ return [t.activities,t.expenses,t.bookings,t.places,t.checklist].every(items=>
+ items.every(x=>x&&typeof x.id==="string"&&typeof x.title==="string"||x&&typeof x.id==="string"&&typeof x.text==="string"))}
 function valid(data){return data&&data.version===1&&Array.isArray(data.trips)&&data.trips.length<=30&&
- data.trips.every(t=>t&&typeof t.id==="string"&&typeof t.title==="string"&&Array.isArray(t.activities)&&
- Array.isArray(t.expenses)&&Array.isArray(t.bookings)&&Array.isArray(t.places)&&Array.isArray(t.checklist)&&
- t.dayNotes&&typeof t.dayNotes==="object")&&bytes(data)<=MAX_BYTES;}
+ data.trips.every(validTrip)&&new Set(data.trips.map(t=>t.id)).size===data.trips.length&&bytes(data)<=MAX_BYTES;}
+
 function local(){
  let raw;try{raw=localStorage.getItem(CLEAN)}catch{throw Error("Không đọc được dữ liệu trên thiết bị.")}
  const v=parse(raw||"");
@@ -22,6 +40,18 @@ function local(){
 }
 function config(){let c;try{c=parse(localStorage.getItem(SETTINGS)||"")}catch{return null}
  return c?.version===1&&typeof c.gistId==="string"&&typeof c.vault?.cipher==="string"?c:null;}
+function recordedOwner(){try{
+ const owner=localStorage.getItem(OWNER);
+ if(owner&&/^[a-z0-9-]{1,39}$/.test(owner))return owner;
+ const previous=config();
+ return typeof previous?.username==="string"?previous.username.toLowerCase():"";
+ }catch{return ""}}
+function requireOwner(username){
+ const incoming=username.toLowerCase(),previous=recordedOwner();
+ if(previous&&previous!==incoming)throw Error("Trình duyệt này đã liên kết dữ liệu với GitHub @"+previous+
+ ". Không thể gắn lịch cũ sang @"+incoming+". Hãy sao lưu JSON và dùng hồ sơ trình duyệt riêng cho người dùng khác. Đây chưa phải đăng nhập nhiều tài khoản.");
+}
+
 function b64(data){let pieces=[];for(let i=0;i<data.length;i+=8192)pieces.push(String.fromCharCode(...data.subarray(i,i+8192)));return btoa(pieces.join(""))}
 function un64(text){const raw=atob(text),a=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)a[i]=raw.charCodeAt(i);return a}
 function random(n){const a=new Uint8Array(n);crypto.getRandomValues(a);return a}
@@ -82,8 +112,13 @@ return found[0]?.id||""}
 async function writeCloud(trips,old,credentials){
 const content=await pack(trips,credentials.pass,(old?manifest(old).revision:0)+1),files={...content.files};
 let saved;
-if(old){for(const name of Object.keys(old.files||{}))if(name.startsWith(PART)&&!Object.hasOwn(files,name))files[name]=null;
-saved=await api("/gists/"+old.id,credentials.token,"PATCH",{files});}
+if(old){
+ // Gist has no atomic compare-and-swap. This check narrows the race window;
+ // concurrent writers still need manual conflict recovery.
+ const head=await gist(old.id,credentials.token);
+ if(signature(head)!==signature(old))throw Error("Cloud vừa được cập nhật từ thiết bị khác. Dừng ghi để tránh mất lịch; hãy đồng bộ lại.");
+ for(const name of Object.keys(old.files||{}))if(name.startsWith(PART)&&!Object.hasOwn(files,name))files[name]=null;
+ saved=await api("/gists/"+old.id,credentials.token,"PATCH",{files});}
 else saved=await api("/gists",credentials.token,"POST",{description:"Make Tour Plan - AES-256-GCM encrypted sync",public:false,files});
 if(!/^[a-f0-9]{8,40}$/i.test(saved?.id||""))throw Error("GitHub chưa xác nhận ID Gist.");
 const confirmed=await gist(saved.id,credentials.token);
@@ -114,8 +149,10 @@ function showChoice(info,g,localSnapshot){downloaded=false;stop();connected=fals
 $("mtc-setup").hidden=true;$("mtc-connected").hidden=true;$("mtc-choose").hidden=false;
 $("mtc-choice-info").textContent=info+" Bản cloud cập nhật "+manifest(g).updatedAt+". Thiết bị này có "+localSnapshot.trips.length+" chuyến.";
 $("mtc-pull").disabled=true;status("Phát hiện hai bản khác nhau. Chưa có dữ liệu nào bị ghi đè.","warning")}
-async function remember(credentials){const vault=await encrypt({token:credentials.token,username:credentials.username},credentials.pass);
-localStorage.setItem(SETTINGS,JSON.stringify({version:1,gistId:credentials.gistId,username:credentials.username,vault}))}
+async function remember(credentials){requireOwner(credentials.username);
+ const vault=await encrypt({token:credentials.token,username:credentials.username},credentials.pass);
+ localStorage.setItem(SETTINGS,JSON.stringify({version:1,gistId:credentials.gistId,username:credentials.username,vault}));
+ localStorage.setItem(OWNER,credentials.username.toLowerCase());}
 async function connectDone(credentials,g){credentials.gistId=g.id;auth=credentials;
 await remember(credentials);base=signature(g);baseline=local().json;lastCheck=Date.now();connected=true;pending=null;
 showReady();stop();clock=setInterval(()=>{if(!document.hidden)void sync(false)},5000)}
@@ -129,11 +166,16 @@ if(saved){const old=await decrypt(saved.vault,pass);token=old?.token;}
 if(typeof token!=="string"||!/^[A-Za-z0-9_-]{20,255}$/.test(token))throw Error("Token GitHub không hợp lệ. Hãy tạo token với quyền Gists: write.");
 status("Đang xác minh GitHub và tìm bản lưu...");
 const user=await api("/user",token);if(typeof user?.login!=="string")throw Error("Không xác nhận được GitHub.");
+if(saved?.username && saved.username.toLowerCase()!==user.login.toLowerCase())
+ throw Error("Token thuộc tài khoản GitHub khác tài khoản được lưu. Để tránh trộn dữ liệu, hãy dùng hồ sơ trình duyệt riêng.");
+requireOwner(user.login);
 let id=$("mtc-gist").value.trim()||saved?.gistId||"";
 if(id&&!/^[a-f0-9]{8,40}$/i.test(id))throw Error("ID Gist chỉ gồm ký tự hex.");
 if(!id)id=await findGist(token);
 const s=local(),credentials={token,pass,username:user.login,gistId:id};
-if(!id){status("Đang tạo bản sao lưu mã hóa...");const created=await writeCloud(s.trips,null,credentials);
+if(!id){if(!confirm("Tạo bản lưu GitHub cho @"+user.login+" từ "+s.trips.length+" chuyến đi trên thiết bị này? Nếu đây là thiết bị dùng chung, hãy chuyển sang hồ sơ trình duyệt riêng để tránh lẫn dữ liệu.")){
+ status("Chưa tải dữ liệu lên. Bạn có thể sao lưu JSON rồi quyết định kết nối.","warning");return;}
+ status("Đang tạo bản sao lưu mã hóa...");const created=await writeCloud(s.trips,null,credentials);
 await connectDone(credentials,created);}
 else{const g=await gist(id,token),trips=await cloudTrips(g,pass);
 if(JSON.stringify(trips)!==s.json){auth=credentials;pending={credentials,gist:g,localJson:s.json};
@@ -171,8 +213,9 @@ status("✅ Đồng bộ hoàn tất lúc "+new Date().toLocaleTimeString("vi-VN
 }catch(e){status("⚠️ "+(e.message||"Mất kết nối")+". Lịch trên máy vẫn được giữ; sẽ thử lại.","warning")}
 finally{busy=false}}
 function disconnect(){showSetup()}
-function forget(){if(!confirm("Quên tài khoản trên máy này? Không xóa chuyến đi và bản sao trên GitHub."))return;
-try{localStorage.removeItem(SETTINGS)}catch{}showSetup()}
+function forget(){if(!confirm("Quên kết nối cloud trên thiết bị này? Lịch cục bộ và bản mã hóa trên GitHub vẫn được giữ. Trình duyệt này vẫn được đánh dấu thuộc tài khoản hiện tại để tránh trộn lịch với tài khoản khác."))return;
+try{const old=config();if(old?.username)localStorage.setItem(OWNER,old.username.toLowerCase());
+ localStorage.removeItem(SETTINGS)}catch{}showSetup()}
 const launch=document.createElement("div");launch.id="mtc-launcher";launch.innerHTML='<button id="mtc-open" type="button">☁️ Đồng bộ thiết bị</button>';document.body.append(launch);
 const overlay=document.createElement("div");overlay.id="mtc-overlay";overlay.hidden=true;
 overlay.innerHTML='<section class="mtc-dialog" role="dialog" aria-modal="true" aria-labelledby="mtc-title">'+
@@ -182,11 +225,12 @@ overlay.innerHTML='<section class="mtc-dialog" role="dialog" aria-modal="true" a
 '<div id="mtc-token-section"><label for="mtc-token">GitHub access token</label><input type="password" id="mtc-token" autocomplete="off" placeholder="github_pat_..." /><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">Tạo GitHub token chỉ có quyền Gists ↗</a></div>'+
 '<label for="mtc-secret">Mật khẩu mã hóa riêng (từ 12 ký tự)</label><input type="password" id="mtc-secret" autocomplete="off" minlength="12" maxlength="200" required />'+
 '<label for="mtc-gist">ID Gist (tùy chọn; mặc định tự tìm)</label><input id="mtc-gist" type="text" autocomplete="off" placeholder="Để trống để tự tìm" />'+
+'<button type="button" id="mtc-initial-backup">⬇ Tải JSON trước khi kết nối</button>'+
 '<button type="submit" id="mtc-connect" class="mtc-primary">Kết nối GitHub</button><button type="button" id="mtc-forget-setup" hidden>Quên thông tin tài khoản trên máy này</button></form>'+
 '<section id="mtc-connected" hidden><p>Đã kết nối <b id="mtc-account"></b>. Mỗi lần mở lại trình duyệt, nhập mật khẩu để mở khóa. Đồng bộ chỉ hoạt động khi trang đang mở và có mạng.</p>'+
 '<a id="mtc-gist-link" target="_blank" rel="noopener noreferrer">Xem bản lưu đã mã hóa trên GitHub ↗</a><div class="mtc-actions"><button id="mtc-now" class="mtc-primary">↻ Đồng bộ ngay</button><button id="mtc-lock">Khóa phiên</button><button id="mtc-forget">Quên thiết bị này</button></div></section>'+
 '<section id="mtc-choose" hidden><p id="mtc-choice-info"></p><div class="mtc-actions"><button id="mtc-backup">⬇ Tải bản sao JSON thiết bị</button><button id="mtc-pull" class="mtc-primary" disabled>Dùng bản cloud</button><button id="mtc-push">Dùng bản thiết bị</button><button id="mtc-stop">Tạm dừng, chưa ghi đè</button></div></section>'+
-'<footer>🔐 AES-256-GCM, PBKDF2-SHA256. GitHub Gist “secret” chỉ không được liệt kê, <b>không phải thư mục riêng tư</b>. Người có URL vẫn xem được dữ liệu mã hóa. Token chỉ giữ dạng mã hóa trên thiết bị, mật khẩu không được lưu. Đừng gửi token vào chat. Nếu hai máy cùng sửa trước khi đồng bộ, bạn sẽ chọn bản cần giữ.</footer></section>';
+'<footer>🔐 AES-256-GCM, PBKDF2-SHA256. GitHub Gist “secret” chỉ không được liệt kê, <b>không phải thư mục riêng tư</b>. Người có URL vẫn xem được dữ liệu mã hóa. Token chỉ giữ dạng mã hóa trên thiết bị, mật khẩu không được lưu. Đừng gửi token vào chat. Nếu hai máy cùng sửa trước khi đồng bộ, bạn sẽ chọn bản cần giữ. <b>Đây không phải hệ thống tài khoản nhiều người dùng:</b> lịch cục bộ có thể được nhìn thấy bởi người khác dùng chung trình duyệt. Mỗi người nên dùng hồ sơ trình duyệt hoặc thiết bị riêng; đăng nhập Google cần cấu hình Firebase.</footer></section>';
 document.body.append(overlay);
 function open(){overlay.hidden=false;document.body.style.overflow="hidden"}
 function close(){overlay.hidden=true;document.body.style.overflow=""}
@@ -194,6 +238,8 @@ $("mtc-open").onclick=open;$("mtc-close").onclick=close;
 overlay.addEventListener("click",e=>{if(e.target===overlay)close()});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!overlay.hidden)close()});
 $("mtc-setup").onsubmit=begin;$("mtc-now").onclick=()=>void sync(true);
+$("mtc-initial-backup").onclick=()=>{try{download();status("Đã tạo tệp sao lưu JSON để giữ riêng trên thiết bị của bạn.","ok")}
+ catch(e){status(e.message||"Chưa sao lưu được JSON.","error")}};
 $("mtc-lock").onclick=disconnect;$("mtc-forget").onclick=forget;$("mtc-forget-setup").onclick=forget;
 $("mtc-backup").onclick=()=>{try{download();downloaded=true;$("mtc-pull").disabled=false;status("Đã tạo tệp JSON thiết bị. Chọn bản cần giữ.","ok")}catch(e){status(e.message,"error")}};
 $("mtc-pull").onclick=()=>void choose(true);$("mtc-push").onclick=()=>void choose(false);$("mtc-stop").onclick=disconnect;

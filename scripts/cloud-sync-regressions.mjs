@@ -12,6 +12,8 @@ assert(html.includes("/Make-Tour-Plan/cloud-sync.css"));
 assert(code.includes("AES-GCM")&&code.includes("PBKDF2")&&code.includes("public:false"));
 const PASSWORD="strong-unique-passphrase-2026";
 const TOKEN="github_pat_"+ "test_x".repeat(9);
+const TOKEN_OTHER="github_pat_"+ "other_y".repeat(9);
+const OWNER="make-tour-plan:cloud:owner:v1";
 
 function trip(title){
  const t=sampleTrip();
@@ -31,9 +33,9 @@ let next=1;
 function clone(v){return JSON.parse(JSON.stringify(v))}
 function respond(status,value){return {ok:status>=200&&status<300,status,json:async()=>clone(value)}}
 async function githubFetch(url,init){
- assert.equal(init.headers.Authorization,"Bearer "+TOKEN);
+ assert([TOKEN,TOKEN_OTHER].includes(init.headers.Authorization.slice(7)), "Only test account tokens accepted");
  const u=new URL(url);
- if(u.pathname==="/user")return respond(200,{login:"tester"});
+ if(u.pathname==="/user")return respond(200,{login:init.headers.Authorization==="Bearer "+TOKEN_OTHER?"another-user":"tester"});
  if(u.pathname==="/gists"){
   if(init.method==="GET")return respond(200,[...cloud.values()]);
   if(init.method==="POST"){
@@ -92,6 +94,7 @@ const A=browser([trip("Đi chơi trên máy tính")]);
 await A.run();
 assert.equal(A.el("mtc-connected").hidden,false,"Desktop should connect and create Gist");
 assert.equal(cloud.size,1);
+assert.equal(A.localStorage.getItem(OWNER),"tester","Cloud data is bound to the original GitHub user");
 const gistId=[...cloud.keys()][0],gist=cloud.get(gistId);
 assert.equal(gist.public,false,"Gist must be unlisted");
 const allContent=Object.values(gist.files).map(f=>f.content).join("");
@@ -139,6 +142,28 @@ await locked.run({token:"",password:"wrong-password-long"});
 assert.equal(locked.el("mtc-connected").hidden,true,"Wrong password must not unlock");
 assert.equal(JSON.parse(locked.localStorage.getItem(CLEAN)).trips[0].title,"Máy tính thay đổi đồng thời");
 
+const anotherDevice=browser([trip("Không được trộn lịch")],storage({[OWNER]:"tester"}));
+await anotherDevice.run({token:TOKEN_OTHER,password:PASSWORD});
+assert.equal(anotherDevice.el("mtc-connected").hidden,true,"New Github user cannot silently adopt another user's browser data");
+assert.match(anotherDevice.el("mtc-status").textContent,/Không thể gắn lịch cũ/);
+assert.equal(anotherDevice.localStorage.getItem(OWNER),"tester");
+assert.equal(JSON.parse(anotherDevice.localStorage.getItem(CLEAN)).trips[0].title,"Không được trộn lịch");
+
+const tampered=cloud.get(gistId).files["make-tour-plan-part-01.txt"];
+const originalPart=tampered.content;
+tampered.content="A"+originalPart.slice(1);
+const corruptBrowser=browser([trip("Dữ liệu thiết bị phải còn nguyên")]);
+await corruptBrowser.run();
+assert.match(corruptBrowser.el("mtc-status").textContent,/không vượt qua kiểm tra toàn vẹn/);
+assert.equal(JSON.parse(corruptBrowser.localStorage.getItem(CLEAN)).trips[0].title,"Dữ liệu thiết bị phải còn nguyên");
+tampered.content=originalPart;
+
+const badDate=trip("Invalid date");
+badDate.startDate="2201-01-01";
+const invalidBrowser=browser([badDate]);
+await invalidBrowser.run();
+assert.match(invalidBrowser.el("mtc-status").textContent,/Chưa có bản lưu hợp lệ/);
+
 const big=trip("Large encrypted file");
 big.notes="X".repeat(1200000);
 const large=browser([big]);
@@ -151,4 +176,4 @@ const manifest=JSON.parse(largeGist.files["make-tour-plan-cloud.json"].content);
 assert(manifest.parts>=4&&manifest.parts<=10,"Large encrypted backup should split into Gist parts");
 assert.equal(Object.keys(largeGist.files).length,manifest.parts+1);
 cloud.clear();for(const g of normalCloud)cloud.set(g.id,g);
-console.log("PASS encrypted gist sync: create, two-device pull/push, conflict, lock, and multi-part backups.");
+console.log("PASS encrypted gist sync: create, two-device pull/push, conflict, account-isolation guard, integrity checks, invalid-date rejection, lock and multi-part backups.");
