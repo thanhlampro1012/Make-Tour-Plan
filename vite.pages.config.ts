@@ -24,7 +24,7 @@ function staticPagesOutput(): Plugin {
       await writeFile(new URL(".nojekyll", `file://${outputRoot}`), "");
       // This tool is intentionally a standalone enhancement to the static client.
       // Preserve it whenever Vite replaces docs/ during the next Pages build.
-      for (const asset of ["smart-planner.js", "smart-planner.css"]) {
+      for (const asset of ["smart-planner.js", "smart-planner.css", "cloud-sync.js", "cloud-sync.css"]) {
         await copyFile(new URL(`./pages/${asset}`, import.meta.url), new URL(`./docs/${asset}`, import.meta.url));
       }
     },

@@ -1,0 +1,36 @@
+/* GitHub cloud sync: mobile and dark theme compatible, isolated from React app. */
+#mtc-launcher{position:fixed;z-index:83;left:15px;bottom:17px}
+#mtc-open{border:1px solid #a8c7b0;box-shadow:0 6px 24px #112a2030;background:#fff;color:#225239;border-radius:30px;font:600 13px "Be Vietnam Pro",system-ui,sans-serif;padding:13px 18px;cursor:pointer}
+#mtc-overlay[hidden],#mtc-setup[hidden],#mtc-connected[hidden],#mtc-choose[hidden],#mtc-token-section[hidden],#mtc-forget-setup[hidden]{display:none!important}
+#mtc-overlay{position:fixed;inset:0;z-index:110;background:#07130cbf;padding:16px;display:flex;align-items:center;justify-content:center}
+#mtc-overlay .mtc-dialog{box-sizing:border-box;max-height:94dvh;overflow-y:auto;width:min(660px,100%);padding:25px;background:#f7faf7;color:#263e2b;border-radius:18px;box-shadow:0 20px 60px #0005;font:14px "Be Vietnam Pro",system-ui,sans-serif}
+#mtc-overlay header{display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
+#mtc-overlay header strong{font-size:23px;line-height:1.3}
+#mtc-overlay header p{font-size:12px;color:#647a69;margin-top:8px}
+#mtc-close{border:0!important;border-radius:50%!important;background:#e4ede4!important;flex-shrink:0;width:39px;height:39px;font-size:20px;cursor:pointer}
+#mtc-overlay p{line-height:1.8}
+#mtc-status{border-radius:9px;background:#e8efe8;color:#345c3c;padding:12px 15px;font-weight:600;margin:19px 0}
+#mtc-status[data-tone="error"]{background:#f9e8e5;color:#94342f}
+#mtc-status[data-tone="warning"]{background:#fff2d9;color:#795521}
+#mtc-status[data-tone="ok"]{background:#e4f2e6;color:#28603c}
+#mtc-setup{display:flex;flex-direction:column;gap:11px}
+#mtc-overlay label{display:block;font-weight:600;color:#38513b}
+#mtc-overlay input{box-sizing:border-box;width:100%;background:#fff;color:#273d2b;border:1px solid #b8cebc;border-radius:8px;padding:12px;font:inherit;min-height:45px}
+#mtc-token-section{display:flex;flex-direction:column;gap:8px}
+#mtc-overlay a{color:#1b6b40;text-decoration:underline}
+#mtc-overlay button{cursor:pointer;min-height:43px;border:1px solid #b7ccba;background:#fff;color:#245035;border-radius:9px;padding:11px 14px;font:600 13px "Be Vietnam Pro",system-ui,sans-serif}
+#mtc-overlay button.mtc-primary{border-color:#2b6141;background:#2b6141;color:#fff}
+#mtc-overlay button:disabled{cursor:not-allowed;opacity:.5}
+#mtc-overlay .mtc-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+#mtc-overlay footer{border-top:1px solid #d6e1d6;color:#6c8270;font-size:11px;line-height:1.8;margin-top:19px;padding-top:14px}
+html.mt-dark #mtc-open{background:#263e2d;color:#e1f3e2;border-color:#52785a}
+html.mt-dark #mtc-overlay .mtc-dialog{background:#1b2a1f;color:#edf6ed}
+html.mt-dark #mtc-overlay input{background:#253b2b;color:#f0f6ee;border-color:#507050}
+html.mt-dark #mtc-overlay label{color:#cfe4d0}
+html.mt-dark #mtc-overlay a{color:#a6ddb3}
+html.mt-dark #mtc-overlay header p,html.mt-dark #mtc-overlay footer{color:#acc5b0}
+html.mt-dark #mtc-overlay button:not(.mtc-primary){background:#314a35;color:#e2f3e4;border-color:#547657}
+html.mt-dark #mtc-status{background:#2a4832;color:#cce3d0}
+html.mt-dark #mtc-status[data-tone="error"]{background:#53352f;color:#ffddd1}
+html.mt-dark #mtc-status[data-tone="warning"]{background:#4d4228;color:#f6dba9}
+@media(max-width:600px){#mtc-launcher{left:8px;bottom:8px}#mtc-open{font-size:11px;padding:11px 12px}#mtc-overlay{padding:6px}#mtc-overlay .mtc-dialog{padding:16px;max-height:98dvh}#mtc-overlay header strong{font-size:18px}#mtc-overlay .mtc-actions button{flex:1}}

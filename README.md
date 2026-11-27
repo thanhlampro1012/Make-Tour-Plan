@@ -6,10 +6,22 @@
 
 **Mở app:** [Make Tour Plan](https://thanhlampro1012.github.io/Make-Tour-Plan/).
 
-Bản GitHub Pages mở trực tiếp, không cần tài khoản hoặc API key. Chuyến đi được lưu tự động trong trình duyệt đang dùng; người khác mở cùng đường dẫn sẽ có dữ liệu riêng trên thiết bị của họ. Chia sẻ đường dẫn app không chia sẻ lịch cá nhân. Dùng **Sao lưu** để tải JSON và **Nhập dữ liệu** để chuyển sang thiết bị khác hoặc mang lịch từ bản cũ sang. Nên sao lưu trước khi xóa dữ liệu trình duyệt, đổi trình duyệt hoặc dùng cửa sổ riêng tư.
+Bản GitHub Pages mở trực tiếp, không cần tài khoản hoặc API key để sử dụng cục bộ. Chuyến đi được lưu tự động trong trình duyệt và có thể bật đồng bộ mã hóa qua GitHub Gist riêng; người khác mở cùng đường dẫn sẽ có dữ liệu riêng trên thiết bị của họ nếu không có quyền kết nối cloud của bạn. Chia sẻ đường dẫn app không chia sẻ lịch cá nhân. Dùng **Sao lưu** để tải JSON và **Nhập dữ liệu** để chuyển sang thiết bị khác hoặc mang lịch từ bản cũ sang. Nên sao lưu trước khi xóa dữ liệu trình duyệt, đổi trình duyệt hoặc dùng cửa sổ riêng tư.
 
 Kho mã nguồn chứa ứng dụng, danh mục gợi ý, tài liệu, kiểm thử và bản web tĩnh tại `docs/`; không chứa dữ liệu chuyến đi thật, cookie, token hay cơ sở dữ liệu người dùng. Bản [Sites riêng theo tài khoản](https://len-duong-hanh-trinh.workspace-qu-1719.chatgpt.site/) có cơ chế đồng bộ riêng; dữ liệu không tự chuyển giữa hai bản.
 
+
+## Đồng bộ dữ liệu giữa thiết bị — tùy chọn GitHub
+
+Bản GitHub Pages hỗ trợ tự động đồng bộ qua một GitHub Gist không liệt kê. Không yêu cầu Firebase hay máy chủ riêng. Bạn vẫn sử dụng app offline theo trình duyệt bình thường nếu chưa bật đồng bộ.
+
+**Cài đặt:** 1) Vào https://github.com/settings/personal-access-tokens/new và tạo fine-grained token với Account permissions: Gists (Read and write), không cấp quyền repository. 2) Trên web chọn nút ☁️ Đồng bộ thiết bị, nhập token và đặt mật khẩu mã hóa riêng dài tối thiểu 12 ký tự. 3) App tạo hoặc tự tìm Gist mã hóa của bạn. Trên điện thoại/máy tính thứ hai cũng nhập token GitHub và cùng mật khẩu, sau đó chọn bản cloud khi app hỏi. Token và mật khẩu không được gửi vào ChatGPT.
+
+**Bảo mật:** Trước khi lưu, dữ liệu chuyến đi được mã hóa trên thiết bị qua AES-256-GCM, khóa dẫn xuất bằng PBKDF2-SHA256, 310.000 lượt với salt ngẫu nhiên. Token GitHub được mã hóa bằng cùng mật khẩu trước khi lưu tại trình duyệt; mật khẩu mã hóa không được ghi vào storage. Mỗi lần mở trang mới cần nhập mật khẩu để mở khóa. Quên mật khẩu nghĩa là không giải mã được bản cloud; nên tiếp tục tải JSON backup. Gist có chế độ secret/unlisted nhưng **không phải private**: bất cứ ai có URL đều xem được nội dung đã mã hóa. Chỉ nên dùng mật khẩu mạnh, không đưa token vào chat, không gửi URL Gist kèm mật khẩu cho người khác.
+
+**Hoạt động:** Khi mở trang và mở khóa, hệ thống theo dõi bản lưu cục bộ mỗi 5 giây và truy vấn GitHub khoảng 40 giây, đồng thời đồng bộ khi quay lại trang hoặc có mạng. Khi cả thiết bị và cloud cùng thay đổi, app sẽ dừng, bắt buộc tải JSON trước khi thay thế bản thiết bị; tùy chọn chọn bản thiết bị ghi lên cloud có bước xác nhận. GitHub Gist không cung cấp khóa giao dịch so sánh-và-ghi tuyệt đối; không nên sửa cùng một chuyến đi trên hai thiết bị cùng lúc khi chúng còn offline. Không có đồng bộ nền khi đóng trang. Giới hạn dữ liệu bản lưu ~1,8 MB theo định dạng app.
+
+**Giới hạn:** Đây là đồng bộ qua GitHub token, **không phải đăng nhập Gmail/Firebase một chạm**. Muốn đăng nhập Google cần tạo dự án Firebase trong tài khoản Google của bạn, cấu hình Google Sign-in, Firestore rules và authorized domains; không tự tạo Firebase bằng Gmail của người dùng chỉ từ repo này. App ChatGPT Sites vẫn có dữ liệu riêng với phiên GitHub Pages và không tự chuyển lịch qua hai hệ thống.
 
 ## Bản kiểm tra 27/11/2026 — Maps, review và ngân sách
 
