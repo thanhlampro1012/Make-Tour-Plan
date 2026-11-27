@@ -1,0 +1,28 @@
+name: Verify Make Tour Plan
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    name: Regressions, types and Pages build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm run install:ci
+      - name: Run regression tests
+        run: npm test
+      - name: TypeScript checks
+        run: node node_modules/typescript/bin/tsc --noEmit
+      - name: Build and verify static GitHub Pages
+        run: npm run build:pages
