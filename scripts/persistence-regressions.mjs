@@ -48,10 +48,10 @@ function server(initial=[baseTrip], revision=1) {
 }
 let nextId=0;
 let alive=[];
-function client(srv, storage=new MemoryStorage(), session=new MemoryStorage(), account='test-user') {
-  const c=createTravelStoreController(account,{localStorage:storage,sessionStorage:session,fetcher:srv.fetcher.bind(srv),makeId:()=>`test-page-${++nextId}`,now:()=>new Date('2026-11-27T00:00:00Z'),debounceMs:60000,timeoutMs:5000});
+function client(srv, storage=new MemoryStorage(), session=new MemoryStorage(), account='test-user',storageScope) {
+  const c=createTravelStoreController(account,{storageScope,localStorage:storage,sessionStorage:session,fetcher:srv.fetcher.bind(srv),makeId:()=>`test-page-${++nextId}`,now:()=>new Date('2026-11-27T00:00:00Z'),debounceMs:60000,timeoutMs:5000});
   alive.push(c);
-  return {c,storage,session,ownKey:()=>session.getItem(`len-duong:v1:${account ?? 'preview'}:active-draft`)};
+  return {c,storage,session,ownKey:()=>session?.getItem(`${storageScope??'len-duong'}:v1:${account ?? 'preview'}:active-draft`)??null};
 }
 function ownRecord(f) {const pointer=f.ownKey();return pointer?JSON.parse(f.storage.getItem(pointer)):null;}
 let passed=0;
@@ -207,6 +207,69 @@ await test('controller compare-and-change refuses a stale React snapshot without
   assert.throws(()=>a.c.change([trip('Stale overwrite attempt')],stale),/đã có thay đổi mới/);assert.deepEqual(a.c.getSnapshot().trips,before);assert.deepEqual([...storage.data.entries()],keysBefore);
   const canonicalEquivalent=clone(before);canonicalEquivalent[0].title=`  ${canonicalEquivalent[0].title}  `;
   a.c.change([trip('Intentional new edit')],canonicalEquivalent);assert.equal(a.c.getSnapshot().trips[0].title,'Intentional new edit');
+});
+
+const pagesScope='make-tour-plan:pages';
+const pagesKey=`${pagesScope}:v1:preview`;
+
+await test('scoped null-user start/change/retry/reload and deliberate empty refresh make zero backend calls',async()=>{
+  const srv=server(),storage=new MemoryStorage(),session=new MemoryStorage();const f=client(srv,storage,session,null,pagesScope);
+  await f.c.start();assert.equal(f.c.getSnapshot().status,'local');assert.equal(f.c.getSnapshot().trips.length,1);
+  f.c.change([trip('My standalone plan')],f.c.getSnapshot().trips);await f.c.retry();await f.c.reloadServer();assert.equal(f.c.getSnapshot().trips[0].title,'My standalone plan');
+  f.c.change([]);await f.c.retry();await f.c.reloadServer();assert.deepEqual(f.c.getSnapshot().trips,[]);f.c.stop();
+  const sameSession=client(srv,storage,session,null,pagesScope);await sameSession.c.start();assert.deepEqual(sameSession.c.getSnapshot().trips,[]);
+  const newTab=client(srv,storage,new MemoryStorage(),null,pagesScope);await newTab.c.start();assert.deepEqual(newTab.c.getSnapshot().trips,[]);assert.equal(srv.calls.length,0);
+});
+
+await test('Pages scope isolates local cache/outbox/session keys from the unchanged Site preview namespace',async()=>{
+  const srv=server(),storage=new MemoryStorage(),session=new MemoryStorage();const site=client(srv,storage,session,null);await site.c.start();site.c.change([trip('Existing Site preview')]);
+  const siteHead=storage.getItem('len-duong:v1:preview:clean');const pages=client(srv,storage,session,null,pagesScope);await pages.c.start();assert.notEqual(pages.c.getSnapshot().trips[0].title,'Existing Site preview');pages.c.change([trip('Pages only')]);
+  assert.equal(storage.getItem('len-duong:v1:preview:clean'),siteHead);assert.equal(JSON.parse(storage.getItem(`${pagesKey}:clean`)).trips[0].title,'Pages only');assert(pages.ownKey().startsWith(`${pagesKey}:outbox:`));
+  const independent=client(srv,storage,new MemoryStorage(),null,'make-tour-plan:another');await independent.c.start();assert.notEqual(independent.c.getSnapshot().trips[0].title,'Pages only');assert.equal(srv.calls.length,0);
+});
+
+await test('focusing a stale clean local tab adopts the newer head without writing it back',async()=>{
+  const originalWindow=globalThis.window;const listeners=new Map();
+  globalThis.window={addEventListener(type,callback){if(!listeners.has(type))listeners.set(type,new Set());listeners.get(type).add(callback);},removeEventListener(type,callback){listeners.get(type)?.delete(callback);}};
+  try {
+    const srv=server(),storage=new MemoryStorage();const a=client(srv,storage,new MemoryStorage(),null,pagesScope),b=client(srv,storage,new MemoryStorage(),null,pagesScope);await a.c.start();await b.c.start();
+    a.c.change([trip('Newest actual edit')]);const head=storage.getItem(`${pagesKey}:clean`);
+    for(const callback of listeners.get('focus')??[])callback();await pause();
+    assert.equal(storage.getItem(`${pagesKey}:clean`),head);assert.equal(b.c.getSnapshot().trips[0].title,'Newest actual edit');
+    const fresh=client(srv,storage,new MemoryStorage(),null,pagesScope);await fresh.c.start();assert.equal(fresh.c.getSnapshot().trips[0].title,'Newest actual edit');assert.equal(srv.calls.length,0);
+  } finally {for(const c of alive)c.stop();alive=[];if(originalWindow===undefined)delete globalThis.window;else globalThis.window=originalWindow;}
+});
+
+await test('local change checks the shared head before a storage event has rendered',async()=>{
+  const srv=server(),storage=new MemoryStorage();const a=client(srv,storage,new MemoryStorage(),null,pagesScope),b=client(srv,storage,new MemoryStorage(),null,pagesScope);await a.c.start();await b.c.start();const stale=clone(a.c.getSnapshot().trips);
+  b.c.change([trip('Other tab latest')]);const head=storage.getItem(`${pagesKey}:clean`);
+  assert.throws(()=>a.c.change([trip('Stale local overwrite')],stale),/tab khác|thay đổi/);assert.equal(storage.getItem(`${pagesKey}:clean`),head);assert.equal(a.c.getSnapshot().trips[0].title,'Other tab latest');assert.equal(srv.calls.length,0);
+});
+
+await test('a local pending draft remains separate when another tab advances the shared head',async()=>{
+  const srv=server(),storage=new MemoryStorage();const a=client(srv,storage,new MemoryStorage(),null,pagesScope),b=client(srv,storage,new MemoryStorage(),null,pagesScope);await a.c.start();await b.c.start();
+  storage.failWrites=true;a.c.change([trip('Pending after quota failure')]);assert.equal(a.c.getSnapshot().status,'error');assert(a.c.getSnapshot().storageWarning);storage.failWrites=false;
+  b.c.change([trip('Newer saved local plan')]);const head=storage.getItem(`${pagesKey}:clean`);a.c.refreshFromStorage();await a.c.retry();
+  assert.equal(a.c.getSnapshot().status,'conflict');assert.equal(a.c.getSnapshot().trips[0].title,'Pending after quota failure');assert.equal(ownRecord(a).trips[0].title,'Pending after quota failure');assert.equal(storage.getItem(`${pagesKey}:clean`),head);
+  await a.c.reloadServer();assert.equal(a.c.getSnapshot().status,'local');assert.equal(a.c.getSnapshot().trips[0].title,'Newer saved local plan');assert.equal(storage.getItem(`${pagesKey}:clean`),head);assert.equal(srv.calls.length,0);
+});
+
+await test('a failed initial local read never seeds over an existing plan when storage recovers',async()=>{
+  const srv=server(),storage=new MemoryStorage();const saved=JSON.stringify({version:1,trips:[trip('Previously saved plan')],revision:7,dirty:false});storage.setItem(`${pagesKey}:clean`,saved);storage.failReads=true;storage.failWrites=true;
+  const f=client(srv,storage,new MemoryStorage(),null,pagesScope);await f.c.start();assert.equal(f.c.getSnapshot().status,'error');assert.deepEqual(f.c.getSnapshot().trips,[]);assert.equal(storage.data.get(`${pagesKey}:clean`),saved);
+  storage.failReads=false;storage.failWrites=false;await f.c.retry();assert.equal(f.c.getSnapshot().trips[0].title,'Previously saved plan');assert.equal(f.c.getSnapshot().status,'local');assert.equal(storage.getItem(`${pagesKey}:clean`),saved);assert.equal(srv.calls.length,0);
+});
+
+await test('scoped local quota/session/corruption failures stay recoverable and make no network requests',async()=>{
+  const srv=server(),storage=new MemoryStorage();storage.failWrites=true;const f=client(srv,storage,new MemoryStorage(),null,pagesScope);await f.c.start();assert.equal(f.c.getSnapshot().status,'error');assert(f.c.getSnapshot().storageWarning);
+  storage.failWrites=false;await f.c.retry();assert.equal(f.c.getSnapshot().status,'local');assert.equal(f.c.getSnapshot().storageWarning,'');
+  const noSession=client(srv,storage,null,null,pagesScope);await noSession.c.start();assert.equal(noSession.c.getSnapshot().status,'local');assert(noSession.c.getSnapshot().storageWarning);
+  const badStorage=new MemoryStorage();badStorage.setItem(`${pagesKey}:clean`,'{broken original');const corrupt=client(srv,badStorage,new MemoryStorage(),null,pagesScope);await corrupt.c.start();assert(corrupt.c.getSnapshot().storageWarning);assert([...badStorage.data.entries()].some(([key,value])=>key.includes(':unreadable:')&&value==='{broken original'));assert.equal(srv.calls.length,0);
+});
+
+await test('scoped local StrictMode start-stop-start does not republish or duplicate a saved head',async()=>{
+  const srv=server(),storage=new MemoryStorage();const f=client(srv,storage,new MemoryStorage(),null,pagesScope);await f.c.start();f.c.change([trip('Stable across effect restart')]);const head=storage.getItem(`${pagesKey}:clean`),keys=[...storage.data.keys()].sort();
+  f.c.stop();await f.c.start();assert.equal(f.c.getSnapshot().status,'local');assert.equal(f.c.getSnapshot().trips[0].title,'Stable across effect restart');assert.equal(storage.getItem(`${pagesKey}:clean`),head);assert.deepEqual([...storage.data.keys()].sort(),keys);assert.equal(srv.calls.length,0);
 });
 
 console.log(`\n${passed} persistence regression scenarios passed.`);

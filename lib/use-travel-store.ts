@@ -17,13 +17,14 @@ export interface TravelStoreSnapshot {
 type StoragePort = Pick<Storage, "getItem" | "setItem" | "removeItem" | "key" | "length">;
 type CleanRecord = { version: 1; trips: Trip[]; revision: number; dirty: false };
 type LegacyRecord = Omit<CleanRecord, "dirty"> & { dirty: boolean };
-type OutboxRecord = { version: 1; kind: "outbox"; trips: Trip[]; baseRevision: number | null; updatedAt: string };
+type OutboxRecord = { version: 1; kind: "outbox"; trips: Trip[]; baseRevision: number | null; updatedAt: string; localSaved?: boolean };
 type AdoptedSource = { key: string; raw: string };
 type KnownRecoveredDraft = { id: string; key: string; raw: string };
 type RemoteState = { trips: Trip[] | null; revision: number };
 
 /** Browser boundaries are injectable so regression tests use the real controller. */
 export interface TravelStoreEnvironment {
+  storageScope?: string;
   localStorage?: StoragePort | null;
   sessionStorage?: StoragePort | null;
   fetcher?: typeof fetch;
@@ -77,7 +78,7 @@ function parseOutbox(raw: string | null): OutboxRecord | null {
     const value: unknown = JSON.parse(raw);
     if (!isRecord(value) || value.version !== 1 || value.kind !== "outbox" || !(value.baseRevision === null || validRevision(value.baseRevision)) || typeof value.updatedAt !== "string" || value.updatedAt.length > 80 || !Number.isFinite(Date.parse(value.updatedAt))) return null;
     const trips = parseTrips(value.trips);
-    return trips ? { version: 1, kind: "outbox", trips, baseRevision: value.baseRevision, updatedAt: value.updatedAt } : null;
+    return trips ? { version: 1, kind: "outbox", trips, baseRevision: value.baseRevision, updatedAt: value.updatedAt, ...(typeof value.localSaved === "boolean" ? { localSaved: value.localSaved } : {}) } : null;
   } catch {
     return null;
   }
@@ -99,7 +100,8 @@ class HttpError extends Error {
  * adopted snapshot is acknowledged and its original bytes are still unchanged.
  */
 export function createTravelStoreController(userId: string | null, environment: TravelStoreEnvironment = {}): TravelStoreController {
-  const legacyKey = `len-duong:v1:${userId ?? "preview"}`;
+  const legacyKey = `${environment.storageScope ?? "len-duong"}:v1:${userId ?? "preview"}`;
+  const standaloneLocal = userId === null && environment.storageScope !== undefined;
   const cleanKey = `${legacyKey}:clean`;
   const outboxPrefix = `${legacyKey}:outbox:`;
   const sessionKey = `${legacyKey}:active-draft`;
@@ -123,6 +125,8 @@ export function createTravelStoreController(userId: string | null, environment: 
   let needsLoad = Boolean(userId);
   let conflict = false;
   let loadedOnce = false;
+  let localHeadReady = false;
+  let localBaseline: CleanRecord | null = null;
   let reloading = false;
   let loadPromise: Promise<void> | null = null;
   let savePromise: Promise<void> | null = null;
@@ -225,6 +229,106 @@ export function createTravelStoreController(userId: string | null, environment: 
     return candidates.sort((a, b) => b.revision - a.revision)[0] ?? null;
   }
 
+  function readLocalHead(): { ok: boolean; head: CleanRecord | null; raw: string | null; corrupt: boolean } {
+    const primary = read(cleanKey);
+    const legacy = read(legacyKey);
+    if (!primary.ok || !legacy.ok) return { ok: false, head: null, raw: null, corrupt: false };
+    const a = parseLegacy(primary.raw);
+    const b = parseLegacy(legacy.raw);
+    const corrupt = Boolean(primary.raw && (!a || a.dirty));
+    if (corrupt || (legacy.raw && !b)) noteUnreadable();
+    const candidates = [a, b].filter((value): value is CleanRecord => Boolean(value && !value.dirty));
+    return { ok: true, head: candidates.sort((x, y) => y.revision - x.revision)[0] ?? null, raw: primary.raw, corrupt };
+  }
+
+  function sameLocalHead(a: CleanRecord | null, b: CleanRecord | null): boolean {
+    return a === null || b === null ? a === b : a.revision === b.revision && sameTrips(a.trips, b.trips);
+  }
+
+  function adoptLocalHead(head: CleanRecord | null) {
+    // A previous page snapshot stays recoverable; adopting another tab's head
+    // must not overwrite its outbox with unrelated subsequent edits.
+    if (ownPersistedRaw && !sameTrips(current, head?.trips ?? [])) {
+      ownKey = `${outboxPrefix}${makeId()}`;
+      ownPersistedRaw = null;
+    }
+    adopted = [];
+    current = head?.trips ?? [];
+    baseRevision = head?.revision ?? 0;
+    localBaseline = head;
+    localHeadReady = true;
+    dirty = false;
+    conflict = false;
+    publish({ trips: current, ready: true, status: "local", message: "" });
+    scanDrafts();
+  }
+
+  function markLocalConflict() {
+    conflict = true;
+    persistDraft();
+    publish({ trips: current, ready: true, status: "conflict", message: "Một tab khác đã lưu kế hoạch mới. Bản nháp của tab này vẫn được giữ riêng. Xuất bản nháp trước khi tải lại bản mới; app chưa ghi đè bản nào." });
+  }
+
+  function saveScopedLocal() {
+    const observed = readLocalHead();
+    if (!observed.ok) {
+      if (dirty) persistDraft();
+      publish({ trips: current, ready: true, status: "error", message: "Chưa đọc được bản lưu trên thiết bị. App chưa tạo lịch mẫu đè lên dữ liệu cũ. Giữ trang mở hoặc xuất JSON, rồi thử lưu lại khi bộ nhớ hoạt động." });
+      return;
+    }
+    if (!localHeadReady) {
+      localHeadReady = true;
+      localBaseline = observed.head;
+      if (!dirty) {
+        if (observed.head) { adoptLocalHead(observed.head); return; }
+        current = [sampleTrip()];
+        baseRevision = 0;
+        dirty = true;
+        modifiedAt = now().toISOString();
+      }
+    }
+    if (!dirty) {
+      if (!sameLocalHead(localBaseline, observed.head)) adoptLocalHead(observed.head);
+      else publish({ ready: true, status: "local", message: "" });
+      return;
+    }
+    if (observed.head && sameTrips(current, observed.head.trips)) {
+      localBaseline = observed.head;
+      baseRevision = observed.head.revision;
+      dirty = false;
+      conflict = false;
+      persistDraft();
+      publish({ trips: current, ready: true, status: "local", message: "" });
+      return;
+    }
+    if (conflict || !sameLocalHead(localBaseline, observed.head) || baseRevision !== (observed.head?.revision ?? 0)) { markLocalConflict(); return; }
+    if (!persistDraft()) {
+      publish({ trips: current, ready: true, status: "error", message: "Chưa lưu được bản nháp trên thiết bị. Giữ trang mở và xuất JSON trước khi rời trang." });
+      return;
+    }
+    // Recheck after writing the outbox; a storage event may not have rendered yet.
+    const latest = readLocalHead();
+    if (!latest.ok) { publish({ ready: true, status: "error", message: "Chưa kiểm tra được bản lưu hiện tại. Bản nháp đã giữ riêng; hãy thử lưu lại." }); return; }
+    if (!sameLocalHead(localBaseline, latest.head)) { markLocalConflict(); return; }
+    if (latest.corrupt && latest.raw && !write(`${legacyKey}:unreadable:${makeId()}`, latest.raw)) {
+      publish({ ready: true, status: "error", message: "Chưa sao lưu được dữ liệu cũ không đọc được. App giữ nguyên bản gốc; hãy xuất bản nháp trước khi dọn bộ nhớ." });
+      return;
+    }
+    const saved: CleanRecord = { version: 1, trips: current, revision: (latest.head?.revision ?? 0) + 1, dirty: false };
+    if (!write(cleanKey, JSON.stringify(saved))) {
+      publish({ trips: current, ready: true, status: "error", message: "Chưa cập nhật được bản lưu dùng chung trên thiết bị. Bản nháp được giữ riêng nếu bộ nhớ cho phép; hãy xuất JSON để sao lưu." });
+      return;
+    }
+    localBaseline = saved;
+    baseRevision = saved.revision;
+    dirty = false;
+    conflict = false;
+    persistDraft();
+    removeAcknowledgedSources(current);
+    publish({ trips: current, ready: true, status: "local", message: "" });
+    scanDrafts();
+  }
+
   function writeCleanCache(trips: Trip[], revision: number): CleanRecord {
     const incoming: CleanRecord = { version: 1, trips, revision, dirty: false };
     const existing = bestCleanCache();
@@ -305,7 +409,7 @@ export function createTravelStoreController(userId: string | null, environment: 
   function persistDraft(): boolean {
     if (!ownKey) ownKey = `${outboxPrefix}${makeId()}`;
     if (!modifiedAt) modifiedAt = now().toISOString();
-    const record: OutboxRecord = { version: 1, kind: "outbox", trips: current, baseRevision, updatedAt: modifiedAt };
+    const record: OutboxRecord = { version: 1, kind: "outbox", trips: current, baseRevision, updatedAt: modifiedAt, ...(standaloneLocal ? { localSaved: !dirty } : {}) };
     const raw = JSON.stringify(record);
     const saved = write(ownKey, raw);
     if (saved) { ownPersistedRaw = raw; pointSessionToOwnDraft(); }
@@ -339,7 +443,8 @@ export function createTravelStoreController(userId: string | null, environment: 
   function bootstrap() {
     ownKey = `${outboxPrefix}${makeId()}`;
     modifiedAt = now().toISOString();
-    const clean = bestCleanCache();
+    const localRead = standaloneLocal ? readLocalHead() : null;
+    const clean = standaloneLocal ? localRead!.head : bestCleanCache();
     const previousKey = readSessionPointer();
     const previousRaw = previousKey ? read(previousKey).raw : null;
     const previous = parseOutbox(previousRaw);
@@ -363,8 +468,22 @@ export function createTravelStoreController(userId: string | null, environment: 
       baseRevision = clean?.revision ?? (userId ? null : 0);
       dirty = !userId;
     }
+    if (standaloneLocal) {
+      localHeadReady = Boolean(localRead?.ok);
+      localBaseline = clean;
+      if (!localHeadReady) {
+        if (!previous && !legacy?.dirty) { current = []; baseRevision = null; dirty = false; }
+      } else if (clean && (previous?.localSaved || (!previous && !legacy?.dirty))) {
+        if (previous && !sameTrips(previous.trips, clean.trips)) adopted = [];
+        current = clean.trips;
+        baseRevision = clean.revision;
+        dirty = false;
+      } else if (dirty && (previous || legacy?.dirty)) {
+        conflict = baseRevision !== (clean?.revision ?? 0);
+      }
+    }
     publish({ trips: current });
-    if (dirty) persistDraft();
+    if (dirty && (!standaloneLocal || localHeadReady)) persistDraft();
     scanDrafts();
     initialized = true;
   }
@@ -521,6 +640,7 @@ export function createTravelStoreController(userId: string | null, environment: 
   }
 
   function savePreview() {
+    if (standaloneLocal) { saveScopedLocal(); return; }
     const saved = persistDraft();
     if (saved) { writeCleanCache(current, 0); removeAcknowledgedSources(current); }
     publish({ trips: current, ready: true, status: saved ? "local" : "error", message: saved ? "" : "Bản xem thử chưa lưu được trên thiết bị. Giữ trang mở và xuất JSON trước khi rời trang." });
@@ -538,6 +658,15 @@ export function createTravelStoreController(userId: string | null, environment: 
   function refreshFromStorage() {
     if (!running || !initialized) return;
     scanDrafts();
+    if (standaloneLocal) {
+      const observed = readLocalHead();
+      if (!observed.ok || !localHeadReady) return;
+      if (!sameLocalHead(localBaseline, observed.head)) {
+        if (dirty) markLocalConflict();
+        else adoptLocalHead(observed.head);
+      }
+      return;
+    }
     if (!userId || dirty || savePromise || loadPromise || reloading) return;
     const clean = bestCleanCache();
     if (clean && (baseRevision === null || clean.revision > baseRevision)) {
@@ -550,6 +679,16 @@ export function createTravelStoreController(userId: string | null, environment: 
   async function reloadServer(): Promise<void> {
     if (reloadPromise) return reloadPromise;
     if (!running) return;
+    if (standaloneLocal) {
+      const observed = readLocalHead();
+      if (!observed.ok || (observed.corrupt && !observed.head)) {
+        publish({ status: "error", message: "Chưa đọc được bản lưu trên thiết bị. Kế hoạch hiện tại và bản nháp chưa bị xóa." });
+        return;
+      }
+      removeOwnDraft();
+      adoptLocalHead(observed.head);
+      return;
+    }
     const epoch = generation;
     const requestedSerial = serial;
     reloading = true;
@@ -602,6 +741,15 @@ export function createTravelStoreController(userId: string | null, environment: 
     if (expectedCurrent !== undefined) {
       const expected = backupSchema.safeParse({ version: 1, trips: expectedCurrent });
       if (!expected.success || !sameTrips(current, expected.data.trips)) throw new Error("Kế hoạch đã có thay đổi mới. Hãy kiểm tra bản hiện tại rồi thử lại; bản mới chưa bị ghi đè.");
+    }
+    if (standaloneLocal) {
+      const observed = readLocalHead();
+      if (!observed.ok) throw new Error("Chưa đọc được bản lưu trên thiết bị. Hãy thử lưu lại trước khi chỉnh sửa để tránh ghi đè dữ liệu chưa được tải.");
+      if (!localHeadReady || !sameLocalHead(localBaseline, observed.head) || conflict) {
+        if (dirty) markLocalConflict();
+        else adoptLocalHead(observed.head);
+        throw new Error("Kế hoạch đã thay đổi ở tab khác hoặc vừa được khôi phục. Hãy kiểm tra bản hiện tại rồi thử lại; bản mới chưa bị ghi đè.");
+      }
     }
     const checked = backupSchema.safeParse({ version: 1, trips: next });
     if (!checked.success) throw new Error(checked.error.issues[0]?.message || "Dữ liệu không hợp lệ.");
@@ -660,8 +808,8 @@ export function createTravelStoreController(userId: string | null, environment: 
   };
 }
 
-export function useTravelStore(user: { id: string; name: string } | null) {
-  const controller = useMemo(() => createTravelStoreController(user?.id ?? null), [user?.id]);
+export function useTravelStore(user: { id: string; name: string } | null, storageScope?: string) {
+  const controller = useMemo(() => createTravelStoreController(user?.id ?? null, { storageScope }), [user?.id, storageScope]);
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getServerSnapshot);
   useEffect(() => { void controller.start(); return () => controller.stop(); }, [controller]);
   return { ...state, change: controller.change, discardDraft: controller.discardDraft, retry: controller.retry, reloadServer: controller.reloadServer };

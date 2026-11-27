@@ -1,10 +1,37 @@
 # Make Tour Plan · Lên đường
 
-Ứng dụng tiếng Việt để lên kế hoạch chuyến đi theo từng ngày, từng giờ. Giao diện responsive, dữ liệu riêng theo tài khoản ChatGPT, tự động lưu vào Cloudflare D1 và giữ bản nháp riêng cho từng tab.
+Ứng dụng tiếng Việt để lên kế hoạch chuyến đi theo từng ngày, từng giờ. Có lịch trình chi tiết, gợi ý địa điểm, ngân sách nhóm, đặt chỗ, checklist và nguồn tham khảo cộng đồng.
 
-**Bản 1.0.0 · rà soát ngày 27/11/2026.**
+**Bản 1.0.0 · GitHub Pages · rà soát ngày 27/11/2026.**
 
-App đang chạy tại [Lên đường](https://len-duong-hanh-trinh.workspace-qu-1719.chatgpt.site/). Đây là không gian riêng theo quyền truy cập hiện có. Kho mã nguồn chứa ứng dụng, danh mục gợi ý, tài liệu và kiểm thử; không chứa dữ liệu chuyến đi thật, cookie, token hay cơ sở dữ liệu người dùng.
+**Mở app:** [Make Tour Plan](https://thanhlampro1012.github.io/Make-Tour-Plan/).
+
+Bản GitHub Pages mở trực tiếp, không cần tài khoản hoặc API key. Chuyến đi được lưu tự động trong trình duyệt đang dùng; người khác mở cùng đường dẫn sẽ có dữ liệu riêng trên thiết bị của họ. Chia sẻ đường dẫn app không chia sẻ lịch cá nhân. Dùng **Sao lưu** để tải JSON và **Nhập dữ liệu** để chuyển sang thiết bị khác hoặc mang lịch từ bản cũ sang. Nên sao lưu trước khi xóa dữ liệu trình duyệt, đổi trình duyệt hoặc dùng cửa sổ riêng tư.
+
+Kho mã nguồn chứa ứng dụng, danh mục gợi ý, tài liệu, kiểm thử và bản web tĩnh tại `docs/`; không chứa dữ liệu chuyến đi thật, cookie, token hay cơ sở dữ liệu người dùng. Bản [Sites riêng theo tài khoản](https://len-duong-hanh-trinh.workspace-qu-1719.chatgpt.site/) có cơ chế đồng bộ riêng; dữ liệu không tự chuyển giữa hai bản.
+
+## Chạy và cập nhật GitHub Pages
+
+Yêu cầu Node.js từ 22.13.0. Sau khi cài dependency, dùng:
+
+```sh
+npm run install:ci
+npm run dev:pages
+```
+
+Để tạo bản xuất bản:
+
+```sh
+npm test
+node node_modules/typescript/bin/tsc --noEmit
+npm run build:pages
+```
+
+`build:pages` tạo HTML, JavaScript, CSS, ảnh và font trong `docs/`, thêm `.nojekyll`, rồi kiểm tra toàn bộ tham chiếu tài nguyên nội bộ. Build chặn module máy chủ trong đồ thị dependency của client. `npm run verify:pages` kiểm tra lại một bản đã build; `npm run preview:pages` xem bản build tại máy phát triển thông thường.
+
+GitHub Settings → Pages: **Deploy from a branch → main → /docs**. Commit cả source lẫn `docs/` sau mỗi lần build. Không cần GitHub Actions cài package hoặc truy cập cơ sở dữ liệu để build lại; Pages xuất bản bộ file đã được kiểm tra. Khi đổi tên repository, sửa `base` trong `vite.pages.config.ts` và build lại. Cấu hình hiện tại là `/Make-Tour-Plan/`.
+
+Bản tĩnh dùng entry riêng `pages/main.tsx`, `user={null}`, và namespace lưu trữ `make-tour-plan:pages`. Nó không chạy xác thực ChatGPT, gọi API lưu chuyến đi hay truy cập Cloudflare D1. Những tính năng cần mạng như mở Google Maps, bài viết hoặc tìm kiếm cộng đồng vẫn cần Internet; HTML xuất riêng dùng để đọc lịch ngoại tuyến. App chưa có service worker để đảm bảo mở lại website khi mất mạng.
 
 ## Hoàn thiện trong bản cuối
 
@@ -38,6 +65,14 @@ App đang chạy tại [Lên đường](https://len-duong-hanh-trinh.workspace-q
 - Ghi chú lưu qua cửa sổ chỉnh sửa có bảo vệ xung đột. Sao lưu/nhập JSON có kiểm tra dữ liệu; lựa chọn thêm mới hoặc thay thế; xuất ICS và in/lưu PDF từ trình duyệt.
 
 ## Dữ liệu & đồng bộ
+
+### GitHub Pages
+
+Mọi thay đổi được lưu vào bộ nhớ cục bộ của trình duyệt. Có khóa riêng cho app và bản nháp riêng theo tab, kiểm tra bản lưu trước khi thay đổi và giữ bản nháp khi phát hiện xung đột. Không có máy chủ đồng bộ giữa thiết bị hoặc tài khoản. LocalStorage không hỗ trợ giao dịch nguyên tử giữa tab: nếu hai tab cùng ghi thực sự đồng thời, bản ghi sau có thể trở thành bản chính; mỗi tab vẫn giữ snapshot riêng để phục hồi. App không tự gộp hai lịch đang xung đột. Nếu trình duyệt từ chối lưu hoặc hết dung lượng, app hiện cảnh báo và cho phép xuất JSON để giữ dữ liệu. Không xem việc đóng tab, xóa cache, mở cửa sổ riêng tư hay chia sẻ đường dẫn là một cách sao lưu.
+
+Để chuyển dữ liệu: ở bản cũ chọn xuất JSON; ở bản mới chọn **Nhập dữ liệu**, kiểm tra bản xem trước, rồi chọn thêm mới hoặc thay thế theo nhu cầu. Bản sao JSON có thể chứa ghi chú, mã đặt chỗ và chi phí riêng; chỉ chia sẻ khi bạn muốn chia sẻ những thông tin đó. Chức năng xuất văn bản rút gọn thích hợp hơn nếu chỉ cần gửi lịch trình.
+
+### Sites theo tài khoản
 
 `travel_states` lưu một tài liệu JSON cho từng người dùng đã xác thực. GET/PUT `/api/trips` yêu cầu danh tính ChatGPT hợp lệ và header `X-Expected-User-Id` trùng danh tính đó. Sai danh tính trả `403 identity_changed` trước khi chạm dữ liệu. Header này là kiểm tra nhất quán, không thay thế xác thực máy chủ. Mỗi lần lưu dùng revision để tránh ghi đè giữa thiết bị; SQL cập nhật có điều kiện là nguyên tử. Bản nháp xung đột luôn giữ revision gốc. Không tự hợp nhất các xung đột: xuất JSON, tải lại bản máy chủ, rồi nhập bản nháp như một chuyến mới nếu cần.
 
@@ -76,7 +111,7 @@ Bản này có khám phá có nguồn, sổ tay nguồn/ý kiến cộng đồng
 
 Nguồn Reddit tại `lib/community-data.json` là ý kiến cá nhân, không phải thông tin địa điểm xác nhận, không quy đổi thành sao. Ngày đăng khác ngày kiểm tra; không lấy giá/thời tiết/tình trạng sân bay được kể trong bình luận làm dữ liệu hiện tại. Mọi thẻ đều dẫn về bài gốc.
 
-## Phát triển
+## Phát triển bản Sites
 
 Dùng starter Sites Vinext với React 19, TypeScript, Zod, Drizzle và Cloudflare D1. Các ảnh và phông chữ được phục vụ từ ứng dụng, không cần CDN khi mở trang.
 
@@ -91,22 +126,22 @@ Trong môi trường Sites được quản lý, dùng `sites-preview start <chec
 
 ## Kiểm tra
 
-`npm test` chạy **6 suite, 91 tình huống/nhóm kiểm tra**, tất cả đã qua trong lần rà cuối:
+`npm test` chạy **6 suite, 99 tình huống/nhóm kiểm tra**, tất cả đã qua trong lần rà cuối:
 
 | Nhóm | Số kiểm tra | Nội dung chính |
 |---|---:|---|
 | Model | 18 | Tiền, hoàn tiền, chia nhóm, ngày/qua đêm, sao chép, ICS, Maps và giới hạn byte |
-| Persistence | 21 | Nhiều tab, CAS phía client, mất mạng/phản hồi, khôi phục, storage lỗi, đổi tài khoản, bỏ đúng bản nháp |
+| Persistence | 29 | Nhiều tab, CAS phía client, mất mạng/phản hồi, khôi phục, storage lỗi, đổi tài khoản; thêm local có namespace, không gọi API, focus/tab cũ, empty reload và StrictMode |
 | Discovery | 5 | 32 địa điểm, schema, nguồn, bộ lịch gợi ý qua nửa đêm/năm mới |
 | UI helpers | 13 | Hợp nhất biểu mẫu, xung đột metadata, đổi thành viên/ngày, nhân bản, xuất ngoại tuyến/chia sẻ |
 | API | 26 | Xác thực, danh tính kỳ vọng, cách ly người dùng, CAS cạnh tranh, request sai và giới hạn UTF-8 |
 | Research/editor | 8 | Liên kết xã hội, Maps mode, nhận diện URL, schema nguồn, chống HTML injection, hoàn tác và stale editor |
 
-Kiểm tra TypeScript đầy đủ cũng đã qua. API tests dùng handler/auth/Drizzle thật với adapter D1 trên SQLite cục bộ; không ghi dữ liệu production.
+Bản GitHub Pages được build riêng bằng `npm run build:pages`; bộ kiểm tra xác nhận `.nojekyll`, project base, favicon, ảnh/font và các tham chiếu tài nguyên nội bộ. Build kiểm tra cả module graph để chặn dependency máy chủ. Kiểm tra TypeScript đầy đủ cũng đã qua. API tests dùng handler/auth/Drizzle thật với adapter D1 trên SQLite cục bộ; không ghi dữ liệu production.
 
 Đã thao tác bản xem thử trong trình duyệt: tạo chuyến và thành viên; lọc/lưu địa điểm, thêm hoạt động; thực chi theo người, chia tiền, hủy/hoàn đặt chỗ; tìm nguồn không dấu, lưu/sửa/đánh dấu đã đọc, tải trang kiểm tra dữ liệu còn; lưu ghi chú, sao chép ngày và Hoàn tác; chọn tuyến công cộng 9 điểm thành 8 chặng, chỉ đường xe máy, bộ lọc mặc định Đà Lạt. Đã quan sát giao diện Nguồn tham khảo và không thấy lỗi ứng dụng trong console của preview.
 
-Giới hạn kiểm chứng: chưa kiểm tra trên thiết bị di động thật, tài khoản production trong trình duyệt hoặc mọi kết quả sau khi mở app Google Maps. Cơ chế đồng bộ được kiểm tra bằng integration/regression; liên kết ngoài cần mạng và khả dụng tùy dịch vụ/khu vực. Build/deploy được thực hiện bằng quy trình Sites sau các kiểm tra trên.
+Giới hạn kiểm chứng: chưa kiểm tra trên thiết bị di động thật, tài khoản production của bản Sites trong trình duyệt hoặc mọi kết quả sau khi mở app Google Maps. Cơ chế đồng bộ Sites được kiểm tra bằng integration/regression; liên kết ngoài cần mạng và khả dụng tùy dịch vụ/khu vực. GitHub Pages có build riêng, không cần máy chủ của Sites.
 
 ## Tài nguyên
 
