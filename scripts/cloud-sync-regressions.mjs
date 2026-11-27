@@ -64,7 +64,7 @@ function browser(trips,shareStorage){
    addEventListener(){},append(){},remove(){},click(){this.onclick?.()}});
   return els.get(id);
  };
- const document={body:{style:{},append(){}},hidden:false,getElementById:el,createElement:()=>({style:{},append(){},remove(){},click(){}}),
+ const document={body:{style:{},append(){}},hidden:false,getElementById:el,createElement:()=>({style:{},append(){},remove(){},click(){},addEventListener(){}}),
  addEventListener(name,cb){handlers.set("doc:"+name,cb)}};
  const window={addEventListener(name,cb){handlers.set("win:"+name,cb)},dispatchEvent(event){handlers.get("win:"+event.type)?.(event)}};
  const URLMock={createObjectURL(){return "blob:sample"},revokeObjectURL(){}};
