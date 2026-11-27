@@ -11,6 +11,9 @@ assert.equal(manifest.start_url,"/Make-Tour-Plan/");
 assert.equal(manifest.display,"standalone");
 assert(manifest.icons.some(x=>x.type==="image/svg+xml"));
 const html=read("docs/index.html");
+assert(html.includes("Content-Security-Policy"),"Pages must ship CSP");
+assert(html.includes("script-src 'self'"),"CSP must restrict scripts");
+assert(html.includes("connect-src 'self' https://api.github.com"),"CSP must allow Gist API and block other connections");
 for(const p of ["manifest.webmanifest","app-icon.svg","register-sw.js"])
  assert(html.includes("/Make-Tour-Plan/"+p),"HTML missing "+p);
 const sw=read("docs/sw.js");
