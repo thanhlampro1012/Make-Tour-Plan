@@ -9,7 +9,7 @@ const enc=new TextEncoder(),dec=new TextDecoder(),$=id=>document.getElementById(
 let auth=null,connected=false,pending=null,busy=false,clock=0,base="",baseline="",lastCheck=0,downloaded=false;
 const parse=x=>{try{return JSON.parse(x)}catch{return null}};
 const bytes=x=>enc.encode(JSON.stringify(x)).length;
-function isoDate(d){if(typeof d!=="string"||!/^\\d{4}-\\d{2}-\\d{2}$/.test(d))return false;
+function isoDate(d){if(typeof d!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(d))return false;
  const year=Number(d.slice(0,4));if(year<1900||year>2199)return false;
  const date=new Date(d+"T00:00:00.000Z");return !Number.isNaN(date.valueOf())&&date.toISOString().slice(0,10)===d;}
 function validTrip(t){if(!t||typeof t!=="object"||typeof t.id!=="string"||
@@ -26,8 +26,12 @@ function validTrip(t){if(!t||typeof t!=="object"||typeof t.id!=="string"||
  !Array.isArray(t.places)||t.places.length>300||
  !Array.isArray(t.checklist)||t.checklist.length>500||
  !t.dayNotes||typeof t.dayNotes!=="object"||Array.isArray(t.dayNotes))return false;
- return [t.activities,t.expenses,t.bookings,t.places,t.checklist].every(items=>
- items.every(x=>x&&typeof x.id==="string"&&typeof x.title==="string"||x&&typeof x.id==="string"&&typeof x.text==="string"))}
+ const hasId=x=>x&&typeof x.id==="string"&&/^[A-Za-z0-9][A-Za-z0-9_-]{0,95}$/.test(x.id);
+return t.activities.every(x=>hasId(x)&&typeof x.title==="string")&&
+ t.expenses.every(x=>hasId(x)&&typeof x.title==="string")&&
+ t.bookings.every(x=>hasId(x)&&typeof x.title==="string")&&
+ t.places.every(x=>hasId(x)&&typeof x.name==="string")&&
+ t.checklist.every(x=>hasId(x)&&typeof x.text==="string")}
 function valid(data){return data&&data.version===1&&Array.isArray(data.trips)&&data.trips.length<=30&&
  data.trips.every(validTrip)&&new Set(data.trips.map(t=>t.id)).size===data.trips.length&&bytes(data)<=MAX_BYTES;}
 
