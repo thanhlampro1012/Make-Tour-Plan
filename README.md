@@ -10,6 +10,19 @@ Bản GitHub Pages mở trực tiếp, không cần tài khoản hoặc API key.
 
 Kho mã nguồn chứa ứng dụng, danh mục gợi ý, tài liệu, kiểm thử và bản web tĩnh tại `docs/`; không chứa dữ liệu chuyến đi thật, cookie, token hay cơ sở dữ liệu người dùng. Bản [Sites riêng theo tài khoản](https://len-duong-hanh-trinh.workspace-qu-1719.chatgpt.site/) có cơ chế đồng bộ riêng; dữ liệu không tự chuyển giữa hai bản.
 
+
+## Bản kiểm tra 27/11/2026 — Maps, review và ngân sách
+
+Công cụ **50 điểm & Lịch thông minh** hiện giới thiệu **72 địa điểm có tên cụ thể thuộc 12 điểm du lịch** (thêm TP.HCM và Vũng Tàu), mỗi nơi có nút *Chỉ đường* Google Maps, *Đánh giá Google Maps*, tìm trải nghiệm trên TikTok, Reddit, Threads và nguồn giới thiệu. Các link là tìm kiếm/mở trang gốc, không phải tích hợp API lấy điểm sao trực tiếp. Địa chỉ đã biết được ưu tiên kèm tên; vẫn cần xác nhận ghim trên Google Maps. Một số nguồn là trang du lịch cấp vùng, không có nghĩa mọi quán được nguồn đó xác thực độc lập.
+
+Chi phí hiển thị là **ước tính biên tập theo người**, ưu tiên lựa chọn miễn phí và bình dân; không tự nhận là giá cập nhật từ Google Maps hay menu. Khoản tham quan, bữa ăn, đồ uống, lưu trú và di chuyển nội thành được dự trù trong lịch. Lịch tính theo số ngày, ngân sách cả nhóm, số người, nhóm tuổi và nhịp đi; hạn chế đường dốc/bậc thang cho gia đình và nhóm lớn tuổi, chừa khoảng chuyển điểm tối thiểu 35 phút. Khoảng đệm không thay cho thời gian đi đường chính xác. Vé máy bay/tàu/xe liên tỉnh, phụ thu lễ và phát sinh **chưa được tính**; cần kiểm tra trực tiếp trước khi đặt chỗ.
+
+Có **10 thẻ nguồn trải nghiệm/giới thiệu có liên kết gốc** cho các điểm nổi bật như Mỹ Khê, Ngũ Hành Sơn, bánh mì Madam Khánh, Cát Cát, Tràng An, Hang Múa, bảo tàng tại TP.HCM, bánh khọt Gốc Vú Sữa, bún cá Nguyên Loan, bánh xèo 7 Tới. Các phần tóm tắt là ý kiến cá nhân từ bài đăng/đánh giá của bên thứ ba, có ngày để người dùng cân nhắc và **không đại diện cho chất lượng hiện tại**. Những nơi còn lại hiển thị liên kết tìm review thật thay vì đánh giá giả.
+
+Lịch trình được **xuất dưới dạng JSON** để nhập vào app như một chuyến đi mới. Dữ liệu của các chuyến hiện có không bị ghi đè; app GitHub Pages tiếp tục lưu trên trình duyệt hiện tại. Khuyến cáo sử dụng mục Sao lưu trước khi xóa dữ liệu trình duyệt hoặc chuyển máy.
+
+Nguồn soát xét: https://vietnam.travel/vi/place-to-go/ ; https://cafegiang.vn/pages/about-us ; https://mycantho.vn/vi/banhxeo7toi ; https://www.reddit.com/r/Vietnam_Tourism/comments/1rxrqia/trang_an_or_tam_coc/ ; https://www.reddit.com/r/VietNam/comments/1rrnbs2/morning_at_da_nangs_my_khe_beach_quietly_healed/ ; https://www.reddit.com/r/VietNam/comments/1ra974f/what_to_do_in_ho_chi_minh_city/ .
+
 ## Chạy và cập nhật GitHub Pages
 
 Yêu cầu Node.js từ 22.13.0. Sau khi cài dependency, dùng:
