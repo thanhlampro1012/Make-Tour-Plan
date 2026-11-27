@@ -26,6 +26,10 @@ Bản GitHub Pages hỗ trợ tự động đồng bộ qua một GitHub Gist kh
 
 **Giới hạn nhiều người dùng trên trình duyệt dùng chung:** GitHub Gist không phải hệ thống tài khoản độc lập. Nếu từng đồng bộ với `@A`, website đánh dấu trình duyệt đó thuộc `@A` và **từ chối kết nối Gist của `@B`** để tránh vô tình đưa lịch của A lên tài khoản B, kể cả sau khi chọn “Quên kết nối”. Chức năng này chỉ là **chốt an toàn chống nhầm tài khoản**, không mã hóa dữ liệu trong bộ nhớ trình duyệt và không chặn người cùng dùng hồ sơ trình duyệt xem lịch cũ. Hãy dùng **hồ sơ trình duyệt khác hoặc thiết bị khác cho mỗi người**. Chỉ triển khai đăng nhập Google sau khi Firebase được cấu hình và kiểm chứng quyền truy cập thật. Trước lần tạo Gist mới, app yêu cầu xác nhận chủ động và có nút tải bản JSON.
 
+## Trải nghiệm điện thoại và ngoại tuyến
+
+Bản GitHub Pages có manifest và biểu tượng ứng dụng riêng để người dùng có thể thêm website vào màn hình chính trên các trình duyệt hỗ trợ. Service worker chỉ lưu các tệp giao diện tĩnh từ `/Make-Tour-Plan/` nhằm mở lại app khi mất mạng sau lần truy cập trực tuyến. **Không lưu bản JSON chuyến đi, token, hoặc phản hồi API của GitHub/Firebase vào service-worker cache.** Lịch trình vẫn do bộ nhớ trình duyệt quản lý và có thể mất nếu xóa dữ liệu website; hãy sao lưu JSON định kỳ. Maps, tìm review và đồng bộ Gist cần Internet và chỉ chạy khi trang mở, đã mở khóa. Khi có cập nhật web mới, kết nối mạng và tải lại trang để nhận phiên bản mới. Chrome và Safari có thể khác nhau về cách hỗ trợ biểu tượng/PWA.
+
 ## Bản kiểm tra 27/11/2026 — Maps, review và ngân sách
 
 Công cụ **72 điểm & Lịch thông minh** hiện giới thiệu **72 địa điểm có tên cụ thể thuộc 12 điểm du lịch** (thêm TP.HCM và Vũng Tàu), mỗi nơi có nút *Chỉ đường* Google Maps, *Đánh giá Google Maps*, tìm trải nghiệm trên TikTok, Reddit, Threads và nguồn giới thiệu. Các link là tìm kiếm/mở trang gốc, không phải tích hợp API lấy điểm sao trực tiếp. Địa chỉ đã biết được ưu tiên kèm tên; vẫn cần xác nhận ghim trên Google Maps. Một số nguồn là trang du lịch cấp vùng, không có nghĩa mọi quán được nguồn đó xác thực độc lập.
