@@ -31,7 +31,7 @@ jobs:
           if test -n "$(git status --porcelain -- docs/)"; then
             echo "::warning::The committed docs/ differs from a clean build. Commit the generated docs/ before treating Pages as current."
             git status --short -- docs/
-            git diff --stat -- docs/
+            git diff -- docs/index.html
           else
             echo "PASS: committed docs/ exactly matches the clean Vite Pages build."
           fi
