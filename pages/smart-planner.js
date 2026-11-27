@@ -5,8 +5,9 @@ const KEY="mtplan:theme";let plan=null;
 const $=id=>document.getElementById(id), fmt=n=>new Intl.NumberFormat("vi-VN").format(n)+" ₫", today=()=>new Date(Date.now()+7*86400000).toISOString().slice(0,10);
 function escape(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 function theme(dark){document.documentElement.classList.toggle("mt-dark",dark);try{localStorage.setItem(KEY,dark?"dark":"light")}catch{}const b=$("mt-theme");if(b)b.textContent=dark?"☀️ Sáng":"🌙 Tối";}
-let initial=false;try{initial=localStorage.getItem(KEY)==="dark"}catch{}theme(initial);
-const launcher=document.createElement("div");launcher.id="mt-launcher";launcher.innerHTML='<button id="mt-theme" type="button" aria-label="Đổi giao diện sáng tối">🌙 Tối</button><button id="mt-open" type="button">🇻🇳 72 điểm & Lịch thông minh</button>';document.body.append(launcher);
+let initial=false;try{initial=localStorage.getItem(KEY)==="dark"}catch{}
+const toolbar=document.createElement("div");toolbar.id="mt-tools";document.body.append(toolbar);
+const launcher=document.createElement("div");launcher.id="mt-launcher";launcher.innerHTML='<button id="mt-theme" type="button" aria-label="Đổi giao diện sáng tối">🌙 Tối</button><button id="mt-open" type="button">🇻🇳 72 điểm & Lịch thông minh</button>';toolbar.append(launcher);theme(initial);
 $("mt-theme").onclick=()=>theme(!document.documentElement.classList.contains("mt-dark"));
 const wrap=document.createElement("div");wrap.id="mt-overlay";wrap.hidden=true;wrap.innerHTML='<div class="mt-dialog" role="dialog" aria-modal="true" aria-labelledby="mt-title"><header class="mt-head"><div><strong id="mt-title">Khám phá Việt Nam</strong><p>72 gợi ý ăn · uống · đi chơi tại 12 điểm du lịch</p></div><button id="mt-close" aria-label="Đóng">✕</button></header><nav class="mt-tabs"><button data-page="planner" class="selected">✨ Lên lịch tham khảo</button><button data-page="catalog">🗺️ 72 địa điểm</button></nav><section id="mt-planner"><form id="mt-form"><div class="mt-fields"><label>Điểm đến<select id="mt-city" required></select></label><label>Số ngày (1–10)<input id="mt-days" type="number" min="1" max="10" value="3" required></label><label>Khởi hành<input id="mt-start" type="date" required></label><label>Ngân sách cả nhóm (₫)<input id="mt-budget" type="number" min="100000" max="1000000000" step="50000" value="4500000" required></label><label>Số người<input id="mt-people" type="number" min="1" max="30" value="2" required></label><label>Nhóm tuổi<select id="mt-age"><option value="young">18–24 · năng động, tiết kiệm</option><option value="adult">25–39 · cân bằng</option><option value="family">Gia đình có trẻ em</option><option value="senior">40+ · thư thả</option></select></label><label>Nhịp đi<select id="mt-pace"><option value="balanced">Vừa phải</option><option value="relaxed">Thong thả</option><option value="active">Nhiều trải nghiệm</option></select></label></div><button type="submit" class="mt-primary">Tạo lịch theo ngân sách</button></form><div id="mt-result" aria-live="polite"></div></section><section id="mt-catalog" hidden><div class="mt-fields"><label>Thành phố<select id="mt-filter-city"><option value="">Tất cả</option></select></label><label>Loại địa điểm<select id="mt-filter-type"><option value="">Ăn · Uống · Đi chơi</option><option value="food">Ăn uống</option><option value="coffee">Cà phê</option><option value="visit">Đi chơi</option></select></label></div><div class="mt-extra-filters"><label>Chi phí tối đa / người<select id="mt-filter-budget"><option value="">Tất cả</option><option value="50000">50.000 ₫</option><option value="100000">100.000 ₫</option><option value="200000">200.000 ₫</option></select></label><label>Tìm địa điểm<input id="mt-filter-search" placeholder="Tên hoặc khu vực, có thể không dấu"></label></div><div id="mt-cards"></div></section><footer>Chi phí và thời lượng là ước tính lập kế hoạch, không phải giá niêm yết hoặc giờ mở cửa. Hãy kiểm tra Maps, vé và phương tiện trước khi đi. <a href="https://vietnam.travel/vi/place-to-go/" target="_blank" rel="noopener noreferrer">Nguồn tham khảo du lịch Việt Nam ↗</a></footer></div>';document.body.append(wrap);
 $("mt-open").onclick=()=>{wrap.hidden=false;document.body.style.overflow="hidden";};
@@ -68,7 +69,7 @@ function makePlan(event){
   const preferred=slots===2?[9*60,13*60]:slots===3?[9*60,12*60+30,15*60+15]:[8*60+30,12*60+15,14*60+45,17*60+15];
   let lastEnd=0;
   for(let i=0;i<pattern.length;i++){
-   const kind=pattern[i],remaining=Math.max(0,ppd-hotel-transport-reserve-daySpentPP);
+   const kind=pattern[i],remaining=Math.max(0,ppd-dailyHotel-transport-reserve-daySpentPP);
    const candidates=cityPlaces.filter(p=>p.type===kind && p.cost<=remaining &&
       (!((age==="family"||age==="senior") && p.effort==="high")))
       .sort((a,b)=>(used.has(a.id)?1:0)-(used.has(b.id)?1:0) ||
@@ -96,13 +97,24 @@ function makePlan(event){
  '<div class="mt-day-links">'+anchor(mapsSearch(x),"Xem đánh giá Maps")+anchor(redditSearch(x),"Reddit")+anchor(tiktokSearch(x),"TikTok")+'</div>').join("")+
  '<p>Khoản dự trù thêm cho '+people+' người: lưu trú '+fmt(d.hotel*people)+' · di chuyển '+fmt(transport*people)+'. Thời gian giữa các điểm có khoảng đệm 35 phút, không phải thời gian dẫn đường thực tế.</p></section>').join("")+
  (warnings.length?'<div class="mt-warnings"><strong>Những điều cần kiểm tra</strong><ul>'+[...new Set(warnings)].map(w=>'<li>'+escape(w)+'</li>').join("")+'</ul></div>':'')+
- '<button id="mt-export" class="mt-primary" type="button">⬇️ Tải lịch JSON để nhập vào app</button><p class="mt-summary">Đóng bảng này, chọn “Nhập dữ liệu” trên trang để thêm lịch mới. Lưu ý kiểm tra vị trí, phương tiện, giá và giờ hoạt động trên nguồn thật.</p>';
+ '<div class="mt-save-actions"><button id="mt-save" class="mt-primary" type="button">Lưu vào Chuyến đi của tôi</button><button id="mt-export" type="button">Tải bản JSON</button></div><p id="mt-save-status" class="mt-summary" role="status"></p>';
  $("mt-export").onclick=exportPlan;
+ $("mt-save").onclick=()=>{
+  const detail={backup:planBackup(),saved:false,error:""};
+  window.dispatchEvent(new CustomEvent("make-tour-plan:add-plan",{detail}));
+  if(detail.saved){
+   $("mt-save").disabled=true;
+   $("mt-save").textContent="Đã thêm chuyến đi";
+   close();
+  }else{
+   $("mt-save-status").textContent=detail.error||"Ứng dụng chưa sẵn sàng. Hãy thử lại hoặc tải bản JSON.";
+  }
+ };
 }
 
 $("mt-form").onsubmit=makePlan;
 
-function exportPlan(){
+function planBackup(){
  if(!plan)return;const p=plan,uid=()=>globalThis.crypto?.randomUUID?.()||"mt-"+Date.now()+"-"+Math.random().toString(36).slice(2);
  const oneDay=p.daysData.flatMap(d=>d.items.map(x=>({
   id:uid(),date:d.date,startTime:x.time,endTime:x.end,endNextDay:false,title:x.name,
@@ -120,10 +132,14 @@ function exportPlan(){
  startDate:p.start,endDate:addDate(p.start,p.days-1),people:p.people,budget:p.budget,
  timezone:"Asia/Ho_Chi_Minh",notes:"Lịch tham khảo theo ngân sách, số ngày và độ tuổi. Tiền ăn, vé tham quan, lưu trú và di chuyển đều là dự trù, không phải báo giá, xác nhận đặt chỗ hoặc thông tin thời gian thực. Ngân sách còn dư có thể dành cho vé đường dài và phát sinh. Kiểm tra đường đi, giá và review trước khi đi.",
  sample:false,activities:oneDay,expenses,bookings:[],places:[],checklist:check,dayNotes:{}};
- const backup={version:1,trips:[trip]};
+ return {version:1,trips:[trip]};
+}
+function exportPlan(){
+ const backup=planBackup();
+ if(!backup)return;
  const blob=new Blob([JSON.stringify(backup,null,2)],{type:"application/json;charset=utf-8"});
  const url=URL.createObjectURL(blob),link=document.createElement("a");
- link.href=url;link.download="lich-tham-khao-"+p.start+".json";document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+ link.href=url;link.download="lich-tham-khao-"+plan.start+".json";document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
 })();

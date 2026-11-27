@@ -24,7 +24,7 @@ Bản GitHub Pages hỗ trợ tự động đồng bộ qua một GitHub Gist kh
 **Giới hạn:** Đây là đồng bộ qua GitHub token, **không phải đăng nhập Gmail/Firebase một chạm**. Muốn đăng nhập Google cần tạo dự án Firebase trong tài khoản Google của bạn, cấu hình Google Sign-in, Firestore rules và authorized domains; không tự tạo Firebase bằng Gmail của người dùng chỉ từ repo này. App ChatGPT Sites vẫn có dữ liệu riêng với phiên GitHub Pages và không tự chuyển lịch qua hai hệ thống.
 
 
-**Giới hạn nhiều người dùng trên trình duyệt dùng chung:** GitHub Gist không phải hệ thống tài khoản độc lập. Nếu từng đồng bộ với `@A`, website đánh dấu trình duyệt đó thuộc `@A` và **từ chối kết nối Gist của `@B`** để tránh vô tình đưa lịch của A lên tài khoản B, kể cả sau khi chọn “Quên kết nối”. Chức năng này chỉ là **chốt an toàn chống nhầm tài khoản**, không mã hóa dữ liệu trong bộ nhớ trình duyệt và không chặn người cùng dùng hồ sơ trình duyệt xem lịch cũ. Hãy dùng **hồ sơ trình duyệt khác hoặc thiết bị khác cho mỗi người**. Chỉ triển khai đăng nhập Google sau khi Firebase được cấu hình và kiểm chứng quyền truy cập thật. Trước lần tạo Gist mới, app yêu cầu xác nhận chủ động và có nút tải bản JSON.
+**Máy dùng chung.** Mở **Đồng bộ thiết bị → Mở phiên trên máy dùng chung** hoặc dùng [liên kết dành cho máy dùng chung](https://thanhlampro1012.github.io/Make-Tour-Plan/?shared=1). Mỗi người nhập token GitHub và mật khẩu mã hóa của mình. Khi mở khóa, ứng dụng tải kho lịch của đúng tài khoản. Tài khoản mới bắt đầu với danh sách trống. Phiên này giữ lịch và thông tin kết nối trong bộ nhớ của tab. Chọn **Đồng bộ ngay** trước khi đăng xuất, nhất là sau khi mất mạng. Đóng tab hoặc tải lại sẽ kết thúc phiên. Tệp JSON do bạn tải xuống vẫn nằm trên thiết bị. Với chế độ cá nhân ở đường dẫn mặc định, trình duyệt vẫn lưu lịch cục bộ và giữ liên kết với chủ tài khoản như trước.
 
 ## Trải nghiệm điện thoại và ngoại tuyến
 
@@ -38,7 +38,7 @@ Chi phí hiển thị là **ước tính biên tập theo người**, ưu tiên 
 
 Có **12 thẻ nguồn trải nghiệm/giới thiệu có liên kết gốc** cho các điểm nổi bật như Mỹ Khê, Ngũ Hành Sơn, bánh mì Madam Khánh, Cát Cát, Tràng An, Hang Múa, bảo tàng tại TP.HCM, bánh khọt Gốc Vú Sữa, bún cá Nguyên Loan, bánh xèo 7 Tới. Các phần tóm tắt là ý kiến cá nhân từ bài đăng/đánh giá của bên thứ ba, có ngày để người dùng cân nhắc và **không đại diện cho chất lượng hiện tại**. Những nơi còn lại hiển thị liên kết tìm review thật thay vì đánh giá giả.
 
-Lịch trình được **xuất dưới dạng JSON** để nhập vào app như một chuyến đi mới. Dữ liệu của các chuyến hiện có không bị ghi đè; app GitHub Pages tiếp tục lưu trên trình duyệt hiện tại. Khuyến cáo sử dụng mục Sao lưu trước khi xóa dữ liệu trình duyệt hoặc chuyển máy.
+Sau khi xem lịch gợi ý, chọn **Lưu vào Chuyến đi của tôi** để thêm một chuyến mới và mở ngay lịch trình đó. Chọn **Tải bản JSON** để lưu riêng một bản trên thiết bị.
 
 Nguồn soát xét: https://vietnam.travel/vi/place-to-go/ ; https://cafegiang.vn/pages/about-us ; https://mycantho.vn/vi/banhxeo7toi ; https://www.reddit.com/r/Vietnam_Tourism/comments/1rxrqia/trang_an_or_tam_coc/ ; https://www.reddit.com/r/VietNam/comments/1rrnbs2/morning_at_da_nangs_my_khe_beach_quietly_healed/ ; https://www.reddit.com/r/VietNam/comments/1ra974f/what_to_do_in_ho_chi_minh_city/ .
 
@@ -63,7 +63,7 @@ npm run build:pages
 
 GitHub Settings → Pages: **Deploy from a branch → main → /docs**. Commit cả source lẫn `docs/` sau mỗi lần build. Không cần GitHub Actions cài package hoặc truy cập cơ sở dữ liệu để build lại; Pages xuất bản bộ file đã được kiểm tra. Khi đổi tên repository, sửa `base` trong `vite.pages.config.ts` và build lại. Cấu hình hiện tại là `/Make-Tour-Plan/`.
 
-Bản tĩnh dùng entry riêng `pages/main.tsx`, `user={null}`, và namespace lưu trữ `make-tour-plan:pages`. Nó không chạy xác thực ChatGPT, gọi API lưu chuyến đi hay truy cập Cloudflare D1. Những tính năng cần mạng như mở Google Maps, bài viết hoặc tìm kiếm cộng đồng vẫn cần Internet; HTML xuất riêng dùng để đọc lịch ngoại tuyến. App chưa có service worker để đảm bảo mở lại website khi mất mạng.
+Bản tĩnh dùng entry riêng `pages/main.tsx`, `user={null}`, và namespace lưu trữ `make-tour-plan:pages`. Nó không chạy xác thực ChatGPT, gọi API lưu chuyến đi hay truy cập Cloudflare D1. Những tính năng cần mạng như mở Google Maps, bài viết hoặc tìm kiếm cộng đồng vẫn cần Internet; HTML xuất riêng dùng để đọc lịch ngoại tuyến. Service worker lưu giao diện để có thể mở lại bản cá nhân sau lần truy cập trực tuyến.
 
 ## Hoàn thiện trong bản cuối
 

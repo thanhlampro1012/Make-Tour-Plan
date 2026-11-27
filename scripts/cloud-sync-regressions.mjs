@@ -24,7 +24,7 @@ function storage(items={}){
  const map=new Map(Object.entries(items));
  return {getItem(k){return map.has(k)?map.get(k):null},
  setItem(k,v){map.set(k,String(v))},removeItem(k){map.delete(k)},
- key(i){return [...map.keys()][i]??null},get length(){return map.size}};
+ clear(){map.clear()},key(i){return [...map.keys()][i]??null},get length(){return map.size}};
 }
 const CLEAN="make-tour-plan:pages:v1:preview:clean";
 const SETTINGS="make-tour-plan:cloud:v1";
@@ -35,12 +35,13 @@ function respond(status,value){return {ok:status>=200&&status<300,status,json:as
 async function githubFetch(url,init){
  assert([TOKEN,TOKEN_OTHER].includes(init.headers.Authorization.slice(7)), "Only test account tokens accepted");
  const u=new URL(url);
- if(u.pathname==="/user")return respond(200,{login:init.headers.Authorization==="Bearer "+TOKEN_OTHER?"another-user":"tester"});
+ const login=init.headers.Authorization==="Bearer "+TOKEN_OTHER?"another-user":"tester";
+ if(u.pathname==="/user")return respond(200,{login});
  if(u.pathname==="/gists"){
-  if(init.method==="GET")return respond(200,[...cloud.values()]);
+  if(init.method==="GET")return respond(200,[...cloud.values()].filter(g=>g.owner.login===login));
   if(init.method==="POST"){
    const payload=JSON.parse(init.body),id=String(next++).padStart(40,"a");
-   const value={id,public:payload.public,files:Object.fromEntries(Object.entries(payload.files).map(([k,v])=>[k,{filename:k,content:v.content,truncated:false}]))};
+   const value={id,owner:{login},public:payload.public,files:Object.fromEntries(Object.entries(payload.files).map(([k,v])=>[k,{filename:k,content:v.content,truncated:false}]))};
    cloud.set(id,value);return respond(201,value);
   }
  }
@@ -57,7 +58,8 @@ async function githubFetch(url,init){
  }
  return respond(404,{message:"Not found"});
 }
-function browser(trips,shareStorage){
+function browser(trips,shareStorage,shared=false){
+ let session=null,reloads=0;
  const localStorage=shareStorage||storage();
  if(trips)localStorage.setItem(CLEAN,JSON.stringify({version:1,trips,revision:1,dirty:false}));
  const els=new Map(),handlers=new Map();
@@ -69,22 +71,29 @@ function browser(trips,shareStorage){
  const document={body:{style:{},append(){}},hidden:false,getElementById:el,createElement:()=>({style:{},append(){},remove(){},click(){},addEventListener(){}}),
  addEventListener(name,cb){handlers.set("doc:"+name,cb)}};
  const window={addEventListener(name,cb){handlers.set("win:"+name,cb)},dispatchEvent(event){handlers.get("win:"+event.type)?.(event)}};
+ window.tourWorkspace={
+  validBackup:value=>backupSchema.safeParse(value).success,
+  openShared(username,trips){
+   session=storage({"make-tour-plan:shared:v1:preview:clean":JSON.stringify({version:1,trips,dirty:false,revision:1})});
+   return session;
+  }
+ };
  const URLMock={createObjectURL(){return "blob:sample"},revokeObjectURL(){}};
  class StorageEventMock{constructor(type,props){this.type=type;Object.assign(this,props)}}
  class EventMock{constructor(type){this.type=type}}
- const context={document,window,localStorage,crypto:webcrypto,TextEncoder,TextDecoder,fetch:githubFetch,
+ const context={document,window,URLSearchParams,localStorage,crypto:webcrypto,TextEncoder,TextDecoder,fetch:githubFetch,
  AbortController,URL:URLMock,setTimeout,clearTimeout,setInterval:()=>1,clearInterval(){},
  btoa:value=>Buffer.from(value,"binary").toString("base64"),
  atob:value=>Buffer.from(value,"base64").toString("binary"),
  confirm:()=>true,StorageEvent:StorageEventMock,Event:EventMock,
- location:{href:"https://thanhlampro1012.github.io/Make-Tour-Plan/"},
+ location:{search:shared?"?shared=1":"",reload(){reloads++},href:"https://thanhlampro1012.github.io/Make-Tour-Plan/"},
  Blob,console,Uint8Array,Date,JSON,Object,Array,Math,Error};
  vm.runInNewContext(code,context,{timeout:10000,filename:"cloud-sync.js"});
  const run=async({token=TOKEN,password=PASSWORD,id=""}={})=>{
   el("mtc-token").value=token;el("mtc-secret").value=password;el("mtc-gist").value=id;
   await el("mtc-setup").onsubmit({preventDefault(){}});
  };
- return {el,localStorage,run,focus(){handlers.get("win:focus")?.()}};
+ return {el,localStorage,run,get session(){return session},get reloads(){return reloads},focus(){handlers.get("win:focus")?.()}};
 }
 async function until(test,label){
  for(let i=0;i<400;i++){if(test())return;await new Promise(r=>setTimeout(r,20))}
@@ -149,9 +158,43 @@ assert.match(anotherDevice.el("mtc-status").textContent,/Không thể gắn lị
 assert.equal(anotherDevice.localStorage.getItem(OWNER),"tester");
 assert.equal(JSON.parse(anotherDevice.localStorage.getItem(CLEAN)).trips[0].title,"Không được trộn lịch");
 
+// Shared tabs may read a known unlisted gist by ID only if the token belongs to its owner.
+const sharedDisk=A.localStorage;
+const diskBefore=Array.from({length:sharedDisk.length},(_,i)=>{
+ const k=sharedDisk.key(i);return [k,sharedDisk.getItem(k)];
+});
+const first=browser(null,sharedDisk,true);
+assert.equal(first.session,null);
+await first.run({password:"wrong-unique-passphrase"});
+assert.equal(first.session,null);
+await first.run();
+const sessionKey="make-tour-plan:shared:v1:preview:clean";
+assert.equal(JSON.parse(first.session.getItem(sessionKey)).trips[0].title,"Máy tính thay đổi đồng thời");
+first.el("mtc-lock").onclick();
+assert.equal(first.reloads,1);
+assert.equal(first.session.length,0);
+const second=browser(null,sharedDisk,true);
+await second.run({token:TOKEN_OTHER,id:gistId});
+assert.equal(second.session,null);
+assert.match(second.el("mtc-status").textContent,/chính tài khoản/);
+await second.run({token:TOKEN_OTHER});
+assert.deepEqual(JSON.parse(second.session.getItem(sessionKey)).trips,[]);
+const secondRecord=JSON.parse(second.session.getItem(sessionKey));
+secondRecord.trips=[trip("Lịch riêng của B")];
+second.session.setItem(sessionKey,JSON.stringify({...secondRecord,revision:2}));
+second.el("mtc-now").onclick();
+await until(()=>second.el("mtc-status").textContent.includes("lưu lên cloud"),"shared upload");
+const otherPhone=browser(null,storage(),true);
+await otherPhone.run({token:TOKEN_OTHER});
+assert.equal(JSON.parse(otherPhone.session.getItem(sessionKey)).trips[0].title,"Lịch riêng của B");
+assert.deepEqual(Array.from({length:sharedDisk.length},(_,i)=>{
+ const k=sharedDisk.key(i);return [k,sharedDisk.getItem(k)];
+}),diskBefore,"Shared sessions must leave personal trips, token vault and ownership untouched");
+cloud.delete([...cloud.values()].find(g=>g.owner.login==="another-user").id);
+
 const tampered=cloud.get(gistId).files["make-tour-plan-part-01.txt"];
 const originalPart=tampered.content;
-tampered.content="A"+originalPart.slice(1);
+tampered.content=(originalPart.startsWith("A")?"B":"A")+originalPart.slice(1);
 const corruptBrowser=browser([trip("Dữ liệu thiết bị phải còn nguyên")]);
 await corruptBrowser.run();
 assert.match(corruptBrowser.el("mtc-status").textContent,/không vượt qua kiểm tra toàn vẹn/);
@@ -165,7 +208,7 @@ await invalidBrowser.run();
 assert.match(invalidBrowser.el("mtc-status").textContent,/Chưa có bản lưu hợp lệ/);
 
 const big=trip("Large encrypted file");
-big.notes="X".repeat(1200000);
+big.expenses=Array.from({length:240},(_,i)=>({id:"expense-"+i,title:"Chi phí",category:"food",cost:0,actualCost:null,perPerson:false,paidBy:"",notes:"X".repeat(5000)}));
 const large=browser([big]);
 const normalCloud=[...cloud.values()];
 cloud.clear();

@@ -26,3 +26,17 @@ html.mt-dark #mt-overlay .mt-community small,html.mt-dark #mt-overlay .mt-no-rat
 html.mt-dark #mt-overlay .mt-links>a,html.mt-dark #mt-overlay .mt-day-links>a{background:#314c39;color:#d7f0dc;border-color:#4d7054}
 html.mt-dark #mt-overlay .mt-links>.mt-action{background:#496e4b}
 @media(max-width:600px){#mt-overlay .mt-extra-filters{grid-template-columns:1fr}#mt-overlay .mt-day time{width:80px;font-size:11px}#mt-overlay .mt-day>div{flex-wrap:wrap}#mt-overlay .mt-day-links{justify-content:flex-start}}
+
+#mt-overlay .mt-save-actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:18px}
+#mt-overlay .mt-save-actions button{margin:0;min-height:44px;padding:10px 16px;border:1px solid currentColor;border-radius:9px;color:inherit;background:transparent;font:inherit;cursor:pointer}
+
+@media(max-width:600px){
+ #mt-tools{position:fixed;z-index:85;inset:auto 0 0;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1.45fr);align-items:stretch;gap:5px;padding:5px 8px max(5px,env(safe-area-inset-bottom));background:var(--white,#fff);border-top:1px solid var(--line,#d3e0d2)}
+ #mt-tools #mt-launcher{display:contents}
+ #mt-tools #mtc-launcher{position:static;grid-column:1;grid-row:1;display:flex}
+ #mt-tools #mt-theme{grid-column:2;grid-row:1}
+ #mt-tools #mt-open{grid-column:3;grid-row:1}
+ #mt-tools button{width:100%;min-height:44px;line-height:1.25;white-space:normal}
+ #root main{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+}
+@media print{#mt-tools,#mt-overlay,#mtc-overlay{display:none!important}}

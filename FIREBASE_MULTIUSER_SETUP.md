@@ -1,6 +1,6 @@
 # Make Tour Plan — nhiều người dùng với Firebase (chưa kích hoạt)
 
-**Mục tiêu:** 100 người dùng khác nhau có thể đăng nhập Google, mỗi người chỉ thấy các chuyến đi của mình và tiếp tục sử dụng trên những thiết bị khác nhau. Đây là tài liệu và quy tắc bảo mật để triển khai; **bản GitHub Pages hiện vẫn đang dùng localStorage và tùy chọn GitHub Gist, chưa có Google Sign-in**.
+**Mục tiêu:** 100 người dùng khác nhau có thể đăng nhập Google, mỗi người chỉ thấy các chuyến đi của mình và tiếp tục sử dụng trên những thiết bị khác nhau. Đây là tài liệu và quy tắc bảo mật để triển khai; **bản GitHub Pages hiện vẫn đang dùng localStorage và tùy chọn GitHub Gist, chưa có Google Sign-in**. Chế độ Gist trên máy dùng chung đã có tại [Make Tour Plan](https://thanhlampro1012.github.io/Make-Tour-Plan/?shared=1).
 
 ## Hạ tầng cần có
 

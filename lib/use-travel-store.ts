@@ -816,8 +816,8 @@ export function createTravelStoreController(userId: string | null, environment: 
   };
 }
 
-export function useTravelStore(user: { id: string; name: string } | null, storageScope?: string) {
-  const controller = useMemo(() => createTravelStoreController(user?.id ?? null, { storageScope }), [user?.id, storageScope]);
+export function useTravelStore(user: { id: string; name: string } | null, storageScope?: string, sessionMemory?: Storage) {
+  const controller = useMemo(() => createTravelStoreController(user?.id ?? null, { storageScope, localStorage: sessionMemory, sessionStorage: sessionMemory }), [user?.id, storageScope, sessionMemory]);
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getServerSnapshot);
   useEffect(() => { void controller.start(); return () => controller.stop(); }, [controller]);
   return { ...state, change: controller.change, discardDraft: controller.discardDraft, retry: controller.retry, reloadServer: controller.reloadServer };
